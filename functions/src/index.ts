@@ -206,17 +206,15 @@ export const optimalHumanizePipeline = onCall(async (request) => {
 
 // Helper function to generate humanized text with improved prompt
 async function generateHumanizedText(originalText: string, writingStyle: string, textLength: string, customInstructions: string): Promise<string> {
-  const basePrompt = `Hey there! I need you to rework my text so it slips past AI detectors and sounds like it came straight from a real person, super natural and all. Can you make it feel like a human wrote it, with that authentic, casual vibe? Here's how to nail it:
+  const basePrompt = `I need you to rework my text so it past AI detectors and sounds like it came straight from a real person, super natural and all. Can you make it feel like a human wrote it? Here's how to nail it:
 
 1. Mix up sentence lengths—some short and snappy, others longer and more detailed for a natural flow.
-2. Use everyday language, like how people actually talk, with a conversational tone.
-3. Toss in a few quirks or tiny imperfections, like a human might when they're writing casually.
-4. Swap out any stiff, formal, or AI-ish words for stuff you'd hear in a real conversation.
-5. Add a bit of personal flair or small connectors to make it feel warm and genuine.
-6. Keep the vocabulary varied, avoiding repetitive words to make it sound fresh and human.
-7. Make it read like a chat with a friend—relaxed, authentic, and totally natural.
-8. Weave in human-like thinking patterns, like little asides, casual phrases, or a touch of humor.
-9. Don't change the core meaning of the text important
+2. Use everyday language, natural language.
+3. Toss in a few tiny imperfections, like a human might when they're writing casually.
+4. Swap out any AI-ish words for stuff you'd hear in a real writing.
+5. Keep the vocabulary varied, avoiding repetitive words to make it sound fresh and human.
+6. Weave in human-like thinking patterns
+7. Don't change the core meaning of the text [important]
 
 please output only the updated/revised text. thanks
 
