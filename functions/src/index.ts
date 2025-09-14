@@ -8,9 +8,9 @@ import OpenAI from "openai";
 initializeApp();
 const db = getFirestore();
 
-// Initialize OpenAI
+// OpenAI client initialization
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
 // Example function - you can add more functions here
@@ -90,7 +90,7 @@ export const checkTextForAI = onCall(async (request) => {
           wordCount: text.split(' ').length,
         });
       } catch (error) {
-        console.log('Error saving AI detection to history:', error);
+        console.error('Error saving AI detection to history:', error);
       }
       
       return {
@@ -110,7 +110,7 @@ export const checkTextForAI = onCall(async (request) => {
     }
     
   } catch (error) {
-    console.log('ZeroGPT API Error:', error);
+    console.error('ZeroGPT API Error:', error);
     
     if (error instanceof HttpsError) {
       throw error;
@@ -123,7 +123,6 @@ export const checkTextForAI = onCall(async (request) => {
 
 // Optimal Humanization Pipeline Function
 export const optimalHumanizePipeline = onCall(async (request) => {
-  // Check if user is authenticated
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "User must be authenticated");
   }
@@ -139,61 +138,62 @@ export const optimalHumanizePipeline = onCall(async (request) => {
   }
 
   try {
-    // Stage 1: Generate humanized version using OpenAI
+    // Stage 1 & 2: Generate humanized text with improved prompt
     const humanizedText = await generateHumanizedText(text, writingStyle, textLength, customInstructions);
     
-    // Stage 2: Test with your AI detector
-    const detectionResult = await testWithYourDetector(humanizedText);
+    // Stage 3: Test with AI detector
+    const initialDetection = await testWithYourDetector(humanizedText);
     
-    // Stage 3: If score is too high, refine
-    let finalText = humanizedText;
-    let finalScore = detectionResult.ai_percentage;
+    let finalHumanizedText = humanizedText;
+    let finalDetection = initialDetection;
     let iterations = 1;
-    
-    if (detectionResult.ai_percentage > 20) { // Threshold for refinement
-      const refined = await refineText(humanizedText, writingStyle, textLength, customInstructions);
-      const refinedDetection = await testWithYourDetector(refined);
-      
-      if (refinedDetection.ai_percentage < detectionResult.ai_percentage) {
-        finalText = refined;
-        finalScore = refinedDetection.ai_percentage;
-        iterations = 2;
-      }
+
+    // Stage 4: Iterative refinement if needed (if AI score > 20%)
+    if (initialDetection.ai_percentage > 20) {
+      const refinementResult = await iterativeRefinement(humanizedText, initialDetection, writingStyle, textLength, customInstructions);
+      finalHumanizedText = refinementResult.text;
+      finalDetection = refinementResult.detection;
+      iterations = refinementResult.iterations;
     }
-    
-    // Save to user's history
+
+    // Calculate improvement
+    const originalDetection = await testWithYourDetector(text);
+    const improvement = Math.max(0, originalDetection.ai_percentage - finalDetection.ai_percentage);
+
+    // Save to history
     try {
       await db.collection('history').add({
         userId: request.auth.uid,
         originalText: text,
-        humanizedText: finalText,
+        humanizedText: finalHumanizedText,
         timestamp: new Date(),
         wordCount: text.split(' ').length,
-        writingStyle: writingStyle || 'professional',
-        textLength: textLength || 'maintain',
-        customInstructions: customInstructions || null,
-        aiDetectionScore: finalScore,
-        iterations: iterations
+        writingStyle: writingStyle,
+        textLength: textLength,
+        customInstructions: customInstructions || '',
+        aiScore: finalDetection.ai_percentage,
+        improvement: improvement,
+        iterations: iterations,
       });
     } catch (error) {
-      console.log('Error saving to history:', error);
+      console.error('Error saving to history:', error);
     }
-    
+
     return {
       success: true,
       original_text: text,
-      humanized_text: finalText,
-      ai_detection_score: finalScore,
-      improvement: Math.max(0, 100 - finalScore),
-      writing_style: writingStyle || 'professional',
-      text_length: textLength || 'maintain',
+      humanized_text: finalHumanizedText,
+      ai_detection_score: finalDetection.ai_percentage,
+      improvement: improvement,
+      writing_style: writingStyle,
+      text_length: textLength,
       iterations_needed: iterations,
       word_count_original: text.split(' ').length,
-      word_count_humanized: finalText.split(' ').length
+      word_count_humanized: finalHumanizedText.split(' ').length,
     };
     
   } catch (error) {
-    console.log('Humanization Pipeline Error:', error);
+    console.error('Humanization Pipeline Error:', error);
     
     if (error instanceof HttpsError) {
       throw error;
@@ -204,18 +204,23 @@ export const optimalHumanizePipeline = onCall(async (request) => {
   }
 });
 
-// Helper function to generate humanized text
+// Helper function to generate humanized text with improved prompt
 async function generateHumanizedText(originalText: string, writingStyle: string, textLength: string, customInstructions: string): Promise<string> {
-  const basePrompt = `You are an expert at humanizing AI-generated text to make it sound natural and human-written. Your goal is to rewrite the following text to be undetectable by AI detection tools while maintaining the original meaning and message.
+  const basePrompt = `Hey there! I need you to rework my text so it slips past AI detectors and sounds like it came straight from a real person, super natural and all. Can you make it feel like a human wrote it, with that authentic, casual vibe? Here's how to nail it:
 
-IMPORTANT INSTRUCTIONS:
-- Make the text sound completely natural and human-written
-- Vary sentence structure and length
-- Add natural human expressions and transitions
-- Remove repetitive patterns
-- Use more conversational and varied vocabulary
-- Maintain the original meaning and key information
-- Make it flow naturally like a human would write it`;
+1. Mix up sentence lengths—some short and snappy, others longer and more detailed for a natural flow.
+2. Use everyday language, like how people actually talk, with a conversational tone.
+3. Toss in a few quirks or tiny imperfections, like a human might when they're writing casually.
+4. Swap out any stiff, formal, or AI-ish words for stuff you'd hear in a real conversation.
+5. Add a bit of personal flair or small connectors to make it feel warm and genuine.
+6. Keep the vocabulary varied, avoiding repetitive words to make it sound fresh and human.
+7. Make it read like a chat with a friend—relaxed, authentic, and totally natural.
+8. Weave in human-like thinking patterns, like little asides, casual phrases, or a touch of humor.
+9. Don't change the core meaning of the text important
+
+please output only the updated/revised text. thanks
+
+text:`;
 
   let styleInstructions = '';
   let lengthInstructions = '';
@@ -224,37 +229,37 @@ IMPORTANT INSTRUCTIONS:
   // Add writing style instructions
   switch (writingStyle) {
     case 'professional':
-      styleInstructions = 'Write in a professional, business-appropriate tone while keeping it natural and human-like.';
+      styleInstructions = 'Keep it professional but still natural and conversational - like a smart colleague explaining something.';
       break;
     case 'casual':
-      styleInstructions = 'Write in a casual, conversational tone as if speaking to a friend.';
+      styleInstructions = 'Make it super casual and friendly - like you\'re chatting with a buddy.';
       break;
     case 'academic':
-      styleInstructions = 'Write in an academic, scholarly tone while maintaining natural human expression.';
+      styleInstructions = 'Keep it scholarly but still human and engaging - like a smart professor who talks naturally.';
       break;
     case 'creative':
-      styleInstructions = 'Write in a creative, engaging style with vivid language and natural flow.';
+      styleInstructions = 'Make it creative and engaging with vivid language - like a storyteller sharing something cool.';
       break;
     default:
-      styleInstructions = 'Write in a natural, human-like style.';
+      styleInstructions = 'Keep it natural and human-like.';
   }
 
   // Add text length instructions
   switch (textLength) {
     case 'expand':
-      lengthInstructions = 'Expand the text to be approximately 20% longer while adding natural human details and explanations.';
+      lengthInstructions = 'Make it about 20% longer by adding natural human details, examples, or explanations.';
       break;
     case 'compress':
-      lengthInstructions = 'Compress the text to be approximately 20% shorter while maintaining all key information and natural flow.';
+      lengthInstructions = 'Make it about 20% shorter while keeping all the important stuff and natural flow.';
       break;
     case 'maintain':
     default:
-      lengthInstructions = 'Maintain approximately the same length as the original text.';
+      lengthInstructions = 'Keep it about the same length as the original.';
   }
 
   // Add custom instructions if provided
   if (customInstructions && customInstructions.trim()) {
-    customInstructionsText = `\n\nADDITIONAL CUSTOM INSTRUCTIONS: ${customInstructions}`;
+    customInstructionsText = `\n\nAlso, here's what I specifically want: ${customInstructions}`;
   }
 
   const fullPrompt = `${basePrompt}
@@ -263,10 +268,7 @@ ${styleInstructions}
 
 ${lengthInstructions}${customInstructionsText}
 
-TEXT TO HUMANIZE:
-${originalText}
-
-HUMANIZED VERSION:`;
+${originalText}`;
 
   try {
     const completion = await openai.chat.completions.create({
@@ -274,7 +276,7 @@ HUMANIZED VERSION:`;
       messages: [
         {
           role: "system",
-          content: "You are an expert at humanizing AI-generated text. Always respond with only the humanized version, no explanations or additional text."
+          content: "You are an expert at making text sound completely human-written. Always respond with only the humanized version, no explanations or additional text."
         },
         {
           role: "user",
@@ -282,7 +284,7 @@ HUMANIZED VERSION:`;
         }
       ],
       max_tokens: 2000,
-      temperature: 0.8,
+      temperature: 0.9, // Higher temperature for more creativity and variation
     });
 
     return completion.choices[0]?.message?.content?.trim() || originalText;
@@ -294,17 +296,17 @@ HUMANIZED VERSION:`;
 
 // Helper function to refine text if needed
 async function refineText(originalText: string, writingStyle: string, textLength: string, customInstructions: string): Promise<string> {
-  const refinementPrompt = `The following text still sounds too AI-generated. Please refine it further to make it sound completely natural and human-written. Focus on:
+  const refinementPrompt = `This text still sounds too AI-generated. Make it even more human and natural:
 
-- Making it more conversational and natural
-- Adding human-like imperfections and variations
-- Using more diverse sentence structures
-- Adding natural transitions and flow
-- Making it sound like a real person wrote it
+- Add more conversational flow and natural speech patterns
+- Include subtle human imperfections and variations
+- Use more diverse sentence structures and lengths
+- Add natural transitions and casual connectors
+- Make it sound like a real person actually wrote this
+- Add tiny personal touches or casual expressions
+- Vary the vocabulary more to avoid repetition
 
-${originalText}
-
-REFINED HUMAN VERSION:`;
+${originalText}`;
 
   try {
     const completion = await openai.chat.completions.create({
@@ -320,14 +322,49 @@ REFINED HUMAN VERSION:`;
         }
       ],
       max_tokens: 2000,
-      temperature: 0.9,
+      temperature: 0.95, // Even higher temperature for refinement
     });
 
     return completion.choices[0]?.message?.content?.trim() || originalText;
   } catch (error) {
     console.log('OpenAI Refinement Error:', error);
-    return originalText; // Return original if refinement fails
+    return originalText;
   }
+}
+
+// Helper function for iterative refinement
+async function iterativeRefinement(originalText: string, detection: any, writingStyle: string, textLength: string, customInstructions: string): Promise<{text: string, detection: any, iterations: number}> {
+  let currentText = originalText;
+  let currentDetection = detection;
+  let iterations = 1;
+  const maxIterations = 3;
+
+  while (currentDetection.ai_percentage > 15 && iterations < maxIterations) {
+    try {
+      // Refine the text
+      const refinedText = await refineText(currentText, writingStyle, textLength, customInstructions);
+      
+      // Test the refined text
+      const newDetection = await testWithYourDetector(refinedText);
+      
+      // If it's better, use it
+      if (newDetection.ai_percentage < currentDetection.ai_percentage) {
+        currentText = refinedText;
+        currentDetection = newDetection;
+      }
+      
+      iterations++;
+    } catch (error) {
+      console.error('Refinement iteration error:', error);
+      break;
+    }
+  }
+
+  return {
+    text: currentText,
+    detection: currentDetection,
+    iterations: iterations
+  };
 }
 
 // Helper function to test with your AI detector
