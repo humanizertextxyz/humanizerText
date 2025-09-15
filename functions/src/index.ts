@@ -30,7 +30,7 @@ export const helloWorld = onCall(async (request) => {
   };
 });
 
-// NEW AI Detection Function - NO AUTHENTICATION REQUIRED
+// ZeroGPT AI Detection Function - NO AUTHENTICATION REQUIRED
 export const checkTextForAI = onCall(async (request) => {
   // ABSOLUTELY NO AUTHENTICATION CHECK - WORKS FOR EVERYONE
   const { text } = request.data;
@@ -120,13 +120,9 @@ export const checkTextForAI = onCall(async (request) => {
   }
 });
 
-// Optimal Humanization Pipeline Function
+// Optimal Humanization Pipeline Function - NO AUTHENTICATION REQUIRED
 export const optimalHumanizePipeline = onCall(async (request) => {
-  // Check if user is authenticated
-  if (!request.auth) {
-    throw new HttpsError("unauthenticated", "User must be authenticated");
-  }
-
+  // NO AUTHENTICATION CHECK - WORKS FOR EVERYONE
   const { text, writingStyle, textLength, customInstructions } = request.data;
   
   if (!text || typeof text !== 'string') {
@@ -154,22 +150,24 @@ export const optimalHumanizePipeline = onCall(async (request) => {
       finalScore = refinedResult.score;
     }
     
-    // Save to user's history
-    try {
-      await db.collection('history').add({
-        userId: request.auth.uid,
-        originalText: text,
-        humanizedText: finalText,
-        timestamp: new Date(),
-        wordCount: text.split(' ').length,
-        writingStyle: writingStyle || 'balanced',
-        textLength: textLength || 'medium',
-        customInstructions: customInstructions || '',
-        aiScore: finalScore,
-      });
-    } catch (error) {
-      console.error('Error saving humanization to history:', error);
-      // Don't throw error here, just log it
+    // Save to user's history ONLY IF AUTHENTICATED
+    if (request.auth && request.auth.uid) {
+      try {
+        await db.collection('history').add({
+          userId: request.auth.uid,
+          originalText: text,
+          humanizedText: finalText,
+          timestamp: new Date(),
+          wordCount: text.split(' ').length,
+          writingStyle: writingStyle || 'balanced',
+          textLength: textLength || 'medium',
+          customInstructions: customInstructions || '',
+          aiScore: finalScore,
+        });
+      } catch (error) {
+        console.error('Error saving humanization to history:', error);
+        // Don't throw error here, just log it
+      }
     }
     
     return {
