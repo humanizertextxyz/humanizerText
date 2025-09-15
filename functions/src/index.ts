@@ -7,7 +7,11 @@ import OpenAI from "openai";
 // Initialize Firebase Admin
 initializeApp();
 const db = getFirestore();
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+// Initialize OpenAI
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 // Example function - you can add more functions here
 export const helloWorld = onCall(async (request) => {
@@ -26,8 +30,9 @@ export const helloWorld = onCall(async (request) => {
   };
 });
 
-// ZeroGPT AI Detection Function - Now works for both authenticated and non-authenticated users
+// ZeroGPT AI Detection Function - NO AUTHENTICATION REQUIRED
 export const checkTextForAI = onCall(async (request) => {
+  // NO AUTHENTICATION CHECK - WORKS FOR EVERYONE
   const { text } = request.data;
   
   if (!text || typeof text !== 'string') {
@@ -71,8 +76,8 @@ export const checkTextForAI = onCall(async (request) => {
       const result = response.data;
       const data = result.data || {};
       
-      // Save detection result to user's history only if authenticated
-      if (request.auth) {
+      // Save detection result to user's history ONLY IF AUTHENTICATED
+      if (request.auth && request.auth.uid) {
         try {
           await db.collection('aiDetections').add({
             userId: request.auth.uid,
@@ -128,69 +133,57 @@ export const optimalHumanizePipeline = onCall(async (request) => {
     throw new HttpsError("invalid-argument", "Text is required and must be a string");
   }
 
-  if (text.trim().split(' ').length < 10) {
-    throw new HttpsError("invalid-argument", "Text must be at least 10 words");
+  if (text.trim().split(' ').length < 30) {
+    throw new HttpsError("invalid-argument", "Text must be at least 30 words");
   }
 
   try {
     // Generate humanized text using OpenAI
-    const prompt = generateHumanizationPrompt(text, writingStyle, textLength, customInstructions);
-    const generatedText = await generateHumanizedText(text, writingStyle, textLength, customInstructions);
+    const humanizedText = await generateHumanizedText(text, writingStyle, textLength, customInstructions);
     
-    // Test the generated text with our AI detector
-    let initialDetection = await testWithYourDetector(generatedText);
+    // Check the humanized text with our AI detector
+    const detectionResult = await checkTextForAIInternal(humanizedText);
     
-    let finalHumanizedText = generatedText;
-    let finalDetection = initialDetection;
-    let iterations = 1;
-
-    // Iterative Refinement
-    while (finalDetection.ai_percentage > 15 && iterations < 3) {
-      const refined = await refineText(finalHumanizedText, writingStyle, textLength, customInstructions);
-      const refinedDetection = await testWithYourDetector(refined);
-      
-      if (refinedDetection.ai_percentage < finalDetection.ai_percentage) {
-        finalHumanizedText = refined;
-        finalDetection = refinedDetection;
-      } else {
-        break; // Stop if no improvement
-      }
-      iterations++;
+    // If AI score is too high, try to refine it
+    let finalText = humanizedText;
+    let finalScore = detectionResult.ai_percentage;
+    
+    if (detectionResult.ai_percentage > 15) {
+      const refinedResult = await refineText(finalText, detectionResult.ai_percentage, writingStyle, textLength, customInstructions);
+      finalText = refinedResult.text;
+      finalScore = refinedResult.score;
     }
-
-    // Save to history
+    
+    // Save to user's history
     try {
       await db.collection('history').add({
         userId: request.auth.uid,
         originalText: text,
-        humanizedText: finalHumanizedText,
+        humanizedText: finalText,
         timestamp: new Date(),
         wordCount: text.split(' ').length,
-        writingStyle: writingStyle,
-        textLength: textLength,
-        customInstructions: customInstructions || null,
-        aiDetectionScore: finalDetection.ai_percentage,
-        iterationsUsed: iterations,
+        writingStyle: writingStyle || 'balanced',
+        textLength: textLength || 'medium',
+        customInstructions: customInstructions || '',
+        aiScore: finalScore,
       });
     } catch (error) {
-      console.error('Error saving to history:', error);
+      console.error('Error saving humanization to history:', error);
+      // Don't throw error here, just log it
     }
-
+    
     return {
       success: true,
-      original_text: text,
-      humanized_text: finalHumanizedText,
-      ai_detection_score: finalDetection.ai_percentage,
-      improvement: Math.max(0, 100 - finalDetection.ai_percentage),
-      writing_style: writingStyle,
-      text_length: textLength,
-      iterations_needed: iterations,
-      word_count_original: text.split(' ').length,
-      word_count_humanized: finalHumanizedText.split(' ').length,
+      originalText: text,
+      humanizedText: finalText,
+      aiScore: finalScore,
+      improvement: Math.max(0, 100 - finalScore),
+      method: 'optimal_pipeline',
+      iterations: detectionResult.ai_percentage > 15 ? 2 : 1
     };
     
   } catch (error) {
-    console.error('Humanization Error:', error);
+    console.error('Humanization Pipeline Error:', error);
     
     if (error instanceof HttpsError) {
       throw error;
@@ -201,58 +194,74 @@ export const optimalHumanizePipeline = onCall(async (request) => {
   }
 });
 
-// Helper function to generate humanization prompt
-function generateHumanizationPrompt(originalText: string, writingStyle: string, textLength: string, customInstructions: string): string {
-  const basePrompt = `I need you to rework my text so it past AI detectors and sounds like it came straight from a real person, super natural and all. Can you make it feel like a human wrote it? Here's how to nail it:
+// Helper function to generate humanized text
+async function generateHumanizedText(text: string, writingStyle: string, textLength: string, customInstructions?: string): Promise<string> {
+  const styleInstructions = getStyleInstructions(writingStyle);
+  const lengthInstructions = getLengthInstructions(textLength);
+  
+  const prompt = `I need you to rework my text so it past AI detectors and sounds like it came straight from a real person, super natural and all. Can you make it feel like a human wrote it? Here's how to nail it:
+
 1. Mix up sentence lengths—some short and snappy, others longer and more detailed for a natural flow.
 2. Use everyday language, natural language.
 3. Toss in a few tiny imperfections, like a human might when they're writing casually.
 4. Swap out any AI-ish words for stuff you'd hear in a real writing.
 5. Keep the vocabulary varied, avoiding repetitive words to make it sound fresh and human.
 6. Weave in human-like thinking patterns
-7. Don't change the core meaning of the text [important]
-please output only the updated/revised text. thanks text:`;
+7. Don't change the core meaning of the text
 
-  let styleInstructions = '';
-  switch (writingStyle) {
-    case 'professional':
-      styleInstructions = 'Make it sound professional and polished while keeping it natural.';
-      break;
-    case 'casual':
-      styleInstructions = 'Make it sound casual and conversational, like talking to a friend.';
-      break;
-    case 'academic':
-      styleInstructions = 'Make it sound academic and scholarly while maintaining natural flow.';
-      break;
-    case 'creative':
-      styleInstructions = 'Make it sound creative and expressive with vivid language.';
-      break;
-    default:
-      styleInstructions = 'Keep the current tone and style.';
+${styleInstructions}
+${lengthInstructions}
+${customInstructions ? `Additional instructions: ${customInstructions}` : ''}
+
+[important] please output only the updated/revised text. thanks
+
+text: ${text}`;
+
+  try {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4",
+      messages: [
+        {
+          role: "user",
+          content: prompt
+        }
+      ],
+      temperature: 0.8,
+      max_tokens: Math.min(4000, text.length * 2),
+    });
+
+    return completion.choices[0]?.message?.content?.trim() || text;
+  } catch (error) {
+    console.error('OpenAI API Error:', error);
+    throw new Error('Failed to generate humanized text');
   }
-
-  let lengthInstructions = '';
-  switch (textLength) {
-    case 'expand':
-      lengthInstructions = 'Expand the text to be about 20% longer while keeping it natural.';
-      break;
-    case 'compress':
-      lengthInstructions = 'Compress the text to be about 20% shorter while keeping all key information.';
-      break;
-    case 'maintain':
-    default:
-      lengthInstructions = 'Keep the text length similar to the original.';
-  }
-
-  const customPart = customInstructions ? `\n\nAdditional instructions: ${customInstructions}` : '';
-
-  return `${basePrompt}\n\nStyle: ${styleInstructions}\nLength: ${lengthInstructions}${customPart}\n\nOriginal text: ${originalText}`;
 }
 
-// Helper function to generate humanized text using OpenAI
-async function generateHumanizedText(originalText: string, writingStyle: string, textLength: string, customInstructions: string): Promise<string> {
-  const prompt = generateHumanizationPrompt(originalText, writingStyle, textLength, customInstructions);
+// Helper function to refine text if AI score is too high
+async function refineText(text: string, currentScore: number, writingStyle: string, textLength: string, customInstructions?: string): Promise<{text: string, score: number}> {
+  const styleInstructions = getStyleInstructions(writingStyle);
+  const lengthInstructions = getLengthInstructions(textLength);
   
+  const prompt = `I need you to rework my text so it past AI detectors and sounds like it came straight from a real person, super natural and all. Can you make it feel like a human wrote it? Here's how to nail it:
+
+1. Mix up sentence lengths—some short and snappy, others longer and more detailed for a natural flow.
+2. Use everyday language, natural language.
+3. Toss in a few tiny imperfections, like a human might when they're writing casually.
+4. Swap out any AI-ish words for stuff you'd hear in a real writing.
+5. Keep the vocabulary varied, avoiding repetitive words to make it sound fresh and human.
+6. Weave in human-like thinking patterns
+7. Don't change the core meaning of the text
+
+The current AI detection score is ${currentScore}%. Make it even more human-like to get the score below 10%.
+
+${styleInstructions}
+${lengthInstructions}
+${customInstructions ? `Additional instructions: ${customInstructions}` : ''}
+
+[important] please output only the updated/revised text. thanks
+
+text: ${text}`;
+
   try {
     const completion = await openai.chat.completions.create({
       model: "gpt-4",
@@ -263,50 +272,29 @@ async function generateHumanizedText(originalText: string, writingStyle: string,
         }
       ],
       temperature: 0.9,
-      max_tokens: 2000,
+      max_tokens: Math.min(4000, text.length * 2),
     });
 
-    return completion.choices[0]?.message?.content || originalText;
+    const refinedText = completion.choices[0]?.message?.content?.trim() || text;
+    
+    // Check the refined text
+    const detectionResult = await checkTextForAIInternal(refinedText);
+    
+    return {
+      text: refinedText,
+      score: detectionResult.ai_percentage
+    };
   } catch (error) {
-    console.error('OpenAI API Error:', error);
-    throw new Error('Failed to generate humanized text');
+    console.error('OpenAI Refinement Error:', error);
+    return {
+      text: text,
+      score: currentScore
+    };
   }
 }
 
-// Helper function to refine text
-async function refineText(originalText: string, writingStyle: string, textLength: string, customInstructions: string): Promise<string> {
-  const refinementPrompt = `The following text still sounds too AI-generated. Please refine it further to make it sound completely natural and human-written. Focus on:
-- Making it more conversational and natural
-- Adding human-like imperfections and variations
-- Using more diverse sentence structures
-- Adding natural transitions and flow
-- Making it sound like a real person wrote it
-- Don't change the core meaning of the text [important]
-
-Original text: ${originalText}`;
-  
-  try {
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4",
-      messages: [
-        {
-          role: "user",
-          content: refinementPrompt
-        }
-      ],
-      temperature: 0.95,
-      max_tokens: 2000,
-    });
-
-    return completion.choices[0]?.message?.content || originalText;
-  } catch (error) {
-    console.error('OpenAI API Error:', error);
-    throw new Error('Failed to refine text');
-  }
-}
-
-// Helper function to test with your AI detector
-async function testWithYourDetector(text: string): Promise<{ai_percentage: number}> {
+// Helper function to check text internally (without authentication)
+async function checkTextForAIInternal(text: string): Promise<any> {
   try {
     const url = 'https://api.zerogpt.com/api/detect/detectText';
     
@@ -339,12 +327,63 @@ async function testWithYourDetector(text: string): Promise<{ai_percentage: numbe
     if (response.status === 200) {
       const result = response.data;
       const data = result.data || {};
-      return { ai_percentage: data.fakePercentage || 0 };
+      
+      return {
+        success: true,
+        is_ai: data.isHuman === 0,
+        is_human: data.isHuman === 1,
+        ai_percentage: data.fakePercentage || 0,
+        feedback: data.feedback || '',
+        language: data.detected_language || '',
+        text_words: data.textWords || 0,
+        ai_words: data.aiWords || 0,
+        highlighted_sentences: data.h || [],
+        full_response: result
+      };
     } else {
-      return { ai_percentage: 50 }; // Default fallback
+      throw new Error(`ZeroGPT API returned status ${response.status}`);
     }
   } catch (error) {
-    console.error('AI Detection Error:', error);
-    return { ai_percentage: 50 }; // Default fallback
+    console.error('Internal AI Detection Error:', error);
+    return {
+      success: false,
+      is_ai: false,
+      is_human: false,
+      ai_percentage: 100,
+      feedback: '',
+      language: '',
+      text_words: 0,
+      ai_words: 0,
+      highlighted_sentences: [],
+      full_response: null
+    };
+  }
+}
+
+// Helper function to get style instructions
+function getStyleInstructions(style: string): string {
+  switch (style) {
+    case 'creative':
+      return 'Make the writing more creative and expressive with vivid descriptions and imaginative language.';
+    case 'professional':
+      return 'Keep the tone professional and formal while maintaining natural flow.';
+    case 'casual':
+      return 'Make the writing more casual and conversational, like talking to a friend.';
+    case 'academic':
+      return 'Maintain an academic tone with proper structure and formal language.';
+    default:
+      return 'Keep a balanced, natural writing style.';
+  }
+}
+
+// Helper function to get length instructions
+function getLengthInstructions(length: string): string {
+  switch (length) {
+    case 'shorter':
+      return 'Make the text more concise while keeping all the important information.';
+    case 'longer':
+      return 'Expand the text with more details and explanations while keeping it natural.';
+    default:
+      return 'Keep the text length similar to the original.';
   }
 }
