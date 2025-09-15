@@ -30,9 +30,9 @@ export const helloWorld = onCall(async (request) => {
   };
 });
 
-// ZeroGPT AI Detection Function - NO AUTHENTICATION REQUIRED
+// NEW AI Detection Function - NO AUTHENTICATION REQUIRED
 export const checkTextForAI = onCall(async (request) => {
-  // NO AUTHENTICATION CHECK - WORKS FOR EVERYONE
+  // ABSOLUTELY NO AUTHENTICATION CHECK - WORKS FOR EVERYONE
   const { text } = request.data;
   
   if (!text || typeof text !== 'string') {
