@@ -180,7 +180,7 @@ const Home: React.FC = () => {
   };
 
   const convertTopPToBackend = (frontendValue: number): number => {
-    const values = [0.85, 0.9, 0.95, 1.0, 0.95, 0.9];
+    const values = [0.85, 0.9, 0.95, 1.0, 0.95, 1.0];
     return values[frontendValue - 1];
   };
 
@@ -201,7 +201,7 @@ const Home: React.FC = () => {
   };
 
   const convertTopPToFrontend = (backendValue: number): number => {
-    const values = [0.85, 0.9, 0.95, 1.0, 0.95, 0.9];
+    const values = [0.85, 0.9, 0.95, 1.0, 0.95, 1.0];
     return values.indexOf(backendValue) + 1;
   };
 

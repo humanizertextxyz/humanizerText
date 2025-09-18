@@ -172,6 +172,14 @@ export const humanizeText = onRequest({secrets: [openaiApiKey], ...corsOptions},
       return;
     }
 
+    // Debug logging to see what values we're receiving
+    console.log('Received parameters:', {
+      temperature,
+      top_p,
+      frequency_penalty,
+      presence_penalty
+    });
+    
     // Generate humanized text using the new advanced method
     const humanizedText = await generateAdvancedHumanizedText(
       text, 
@@ -337,7 +345,7 @@ Output with everything to make sure it's done to my information and instructions
         { role: "user", content: prompt }
       ],
       temperature: temperature || 0.95,
-      top_p: top_p || 1.0,
+      top_p: Math.min(top_p || 1.0, 1.0), // Ensure top_p never exceeds 1.0
       frequency_penalty: frequency_penalty || 0.6,
       presence_penalty: presence_penalty || 0.1,
       max_tokens: 1000
