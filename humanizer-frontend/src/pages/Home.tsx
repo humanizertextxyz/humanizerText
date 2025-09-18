@@ -175,17 +175,17 @@ const Home: React.FC = () => {
 
   // Helper functions to convert between frontend numbers and backend values
   const convertTemperatureToBackend = (frontendValue: number): number => {
-    const values = [0.7, 0.8, 0.9, 1.0, 1.1];
+    const values = [0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3];
     return values[frontendValue - 1];
   };
 
   const convertTopPToBackend = (frontendValue: number): number => {
-    const values = [0.85, 0.9, 0.95, 1.0];
+    const values = [0.85, 0.9, 0.95, 1.0, 1.05, 1.1];
     return values[frontendValue - 1];
   };
 
   const convertFrequencyPenaltyToBackend = (frontendValue: number): number => {
-    const values = [0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7];
+    const values = [0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8];
     return values[frontendValue - 1];
   };
 
@@ -196,17 +196,17 @@ const Home: React.FC = () => {
 
   // Helper functions to convert from backend values to frontend numbers
   const convertTemperatureToFrontend = (backendValue: number): number => {
-    const values = [0.7, 0.8, 0.9, 1.0, 1.1];
+    const values = [0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3];
     return values.indexOf(backendValue) + 1;
   };
 
   const convertTopPToFrontend = (backendValue: number): number => {
-    const values = [0.85, 0.9, 0.95, 1.0];
+    const values = [0.85, 0.9, 0.95, 1.0, 1.05, 1.1];
     return values.indexOf(backendValue) + 1;
   };
 
   const convertFrequencyPenaltyToFrontend = (backendValue: number): number => {
-    const values = [0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7];
+    const values = [0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8];
     return values.indexOf(backendValue) + 1;
   };
 
@@ -1691,7 +1691,7 @@ const Home: React.FC = () => {
                       value={temperature}
                       onChange={(_, newValue) => setTemperature(newValue as number)}
                       min={1}
-                      max={5}
+                      max={7}
                       step={1}
                       sx={{
                         color: '#667eea',
@@ -1718,7 +1718,7 @@ const Home: React.FC = () => {
                       value={topP}
                       onChange={(_, newValue) => setTopP(newValue as number)}
                       min={1}
-                      max={4}
+                      max={6}
                       step={1}
                       sx={{
                         color: '#667eea',
@@ -1745,7 +1745,7 @@ const Home: React.FC = () => {
                       value={frequencyPenalty}
                       onChange={(_, newValue) => setFrequencyPenalty(newValue as number)}
                       min={1}
-                      max={7}
+                      max={9}
                       step={1}
                       sx={{
                         color: '#667eea',

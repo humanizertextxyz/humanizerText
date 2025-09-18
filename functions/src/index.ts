@@ -222,6 +222,16 @@ async function generateAdvancedHumanizedText(
   presence_penalty?: number
 ): Promise<string> {
   
+  // Pre-process the input text to remove all em dashes
+  // This ensures the model never sees them in the input, making it impossible to output them
+  const cleanedText = text.replace(/—/g, ' ');
+  
+  // Debug logging to see if em dashes are being removed
+  console.log('Original text contains em dashes:', text.includes('—'));
+  console.log('Cleaned text contains em dashes:', cleanedText.includes('—'));
+  console.log('Em dash count in original:', (text.match(/—/g) || []).length);
+  console.log('Em dash count in cleaned:', (cleanedText.match(/—/g) || []).length);
+  
   // Get length instructions based on textLength
   const lengthInstruction = getLengthInstructions(textLength || 'maintain');
   
@@ -251,7 +261,8 @@ Output Rules (IMPORTANT)
 * Return only the rewritten text, no commentary.
 * ${lengthInstruction}
 * DO NOT INCLUDE EM DASHES "—" ANYWHERE IN YOUR OUTPUT AT ALL!
-TEXT: ${text}
+* REMOVE ALL EM DASHES "—" FROM THE INPUT TEXT AND REPLACE WITH APPROPRIATE PUNCTUATION (commas, periods, or semicolons)
+TEXT: ${cleanedText}
 
 Optional Add-Ons (If nothing is listed, skip over it)
 * Keywords to preserve verbatim: ${keywordsToPreserve || ''}
@@ -272,8 +283,8 @@ COMPREHENSIVE WRITING GUIDELINES:
 DO:
 Have tiny unnoticeable imperfections
 
-DON'T ANY OF THIS:   
-AI text similarities
+DON'T:   
+AI text similarities:
 Formulaic Structure
 The text follows a rigid, structured format with clear transitions, headings, and connectors, making it feel predictable and formulaic.
 Robotic or Impersonal Tone
@@ -305,6 +316,8 @@ DON'T USE THESE WORDS/PHRASES:
 "Plays a crucial role"
 "highlights the importance"
 "Crucial"
+
+Output with everything to make sure it's done to my information and instructions. If not, redo the output until it is.
 `;
 
   try {
@@ -322,7 +335,8 @@ DON'T USE THESE WORDS/PHRASES:
             "You are a precise line editor. Rewrite the user's text with the same meaning. Increase lexical surprise " +
             "and vary sentence lengths; include one short fragment. Avoid repeating " +
             "distinctive phrases or sentence starters. Keep facts, entities, and logic. " +
-            "Slightly relaxed tone is OK, but stay readable. Output only the rewrite."
+            "Slightly relaxed tone is OK, but stay readable. NEVER use em dashes (—) in your output. " +
+            "Replace any em dashes in the input with appropriate punctuation. Output only the rewrite."
           )
         },
         { role: "user", content: prompt }
@@ -334,7 +348,16 @@ DON'T USE THESE WORDS/PHRASES:
       max_tokens: 1000
     });
 
-    return completion.choices[0]?.message?.content?.trim() || text;
+    const result = completion.choices[0]?.message?.content?.trim() || text;
+    
+    // Post-process the result to remove any em dashes that the AI might have added
+    const finalResult = result.replace(/—/g, ' ');
+    
+    // Debug logging for the final result
+    console.log('AI output contains em dashes:', result.includes('—'));
+    console.log('Final result contains em dashes:', finalResult.includes('—'));
+    
+    return finalResult;
   } catch (error) {
     console.error('OpenAI API Error:', error);
     throw new Error('Failed to generate humanized text');
