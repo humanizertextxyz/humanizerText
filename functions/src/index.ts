@@ -1,17 +1,26 @@
-import {onCall, HttpsError} from "firebase-functions/v2/https";
+import {onCall, onRequest, HttpsError} from "firebase-functions/v2/https";
+import {defineSecret} from "firebase-functions/params";
 import {initializeApp} from "firebase-admin/app";
 import {getFirestore} from "firebase-admin/firestore";
 import axios from "axios";
 import OpenAI from "openai";
 
+// Export Stripe functions
+export { createStripeProducts, createCheckoutSession, stripeWebhook, validateCoupon } from './stripe-functions';
+
+// Define the OpenAI API key as a secret
+const openaiApiKey = defineSecret("OPENAI_API_KEY");
+
 // Initialize Firebase Admin
 initializeApp();
 const db = getFirestore();
 
-// Initialize OpenAI
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// OpenAI will be initialized within functions that need it
+
+// CORS configuration for HTTP functions
+const corsOptions = {
+  cors: true
+};
 
 // Example function - you can add more functions here
 export const helloWorld = onCall(async (request) => {
@@ -30,270 +39,37 @@ export const helloWorld = onCall(async (request) => {
   };
 });
 
-// ZeroGPT AI Detection Function - NO AUTHENTICATION REQUIRED
-export const checkTextForAI = onCall(async (request) => {
-  // ABSOLUTELY NO AUTHENTICATION CHECK - WORKS FOR EVERYONE
-  const { text } = request.data;
+// ZeroGPT AI Detection Function - HTTP Function (NO AUTHENTICATION REQUIRED)
+export const detectAiText = onRequest(corsOptions, async (req, res) => {
+  // Set CORS headers
+  res.set('Access-Control-Allow-Origin', 'https://humanizertext.xyz, https://humanizertext-551ee.web.app');
+  res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type');
   
-  if (!text || typeof text !== 'string') {
-    throw new HttpsError("invalid-argument", "Text is required and must be a string");
+  // Handle preflight request
+  if (req.method === 'OPTIONS') {
+    res.status(204).send('');
+    return;
   }
-
-  if (text.trim().split(' ').length < 30) {
-    throw new HttpsError("invalid-argument", "Text must be at least 30 words");
-  }
-
-  try {
-    const url = 'https://api.zerogpt.com/api/detect/detectText';
-    
-    const headers = {
-      'Accept': 'application/json, text/plain, */*',
-      'Accept-Encoding': 'gzip, deflate, br, zstd',
-      'Accept-Language': 'en-US,en;q=0.9',
-      'Connection': 'keep-alive',
-      'Content-Type': 'application/json',
-      'DNT': '1',
-      'Origin': 'https://www.zerogpt.com',
-      'Referer': 'https://www.zerogpt.com/',
-      'Sec-Ch-Ua': '"Chromium";v="139", "Not;A=Brand";v="99"',
-      'Sec-Ch-Ua-Mobile': '?0',
-      'Sec-Ch-Ua-Platform': '"macOS"',
-      'Sec-Fetch-Dest': 'empty',
-      'Sec-Fetch-Mode': 'cors',
-      'Sec-Fetch-Site': 'same-site',
-      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36'
-    };
-    
-    const payload = { input_text: text };
-    
-    const response = await axios.post(url, payload, { 
-      headers, 
-      timeout: 30000,
-      validateStatus: () => true // Don't throw on HTTP error status codes
-    });
-    
-    if (response.status === 200) {
-      const result = response.data;
-      const data = result.data || {};
-      
-      // Save detection result to user's history ONLY IF AUTHENTICATED
-      if (request.auth && request.auth.uid) {
-        try {
-          await db.collection('aiDetections').add({
-            userId: request.auth.uid,
-            text: text,
-            result: data,
-            timestamp: new Date(),
-            wordCount: text.split(' ').length,
-          });
-        } catch (error) {
-          console.error('Error saving AI detection to history:', error);
-          // Don't throw error here, just log it
-        }
-      }
-      
-      return {
-        success: true,
-        is_ai: data.isHuman === 0,
-        is_human: data.isHuman === 1,
-        ai_percentage: data.fakePercentage || 0,
-        feedback: data.feedback || '',
-        language: data.detected_language || '',
-        text_words: data.textWords || 0,
-        ai_words: data.aiWords || 0,
-        highlighted_sentences: data.h || [],
-        full_response: result
-      };
-    } else {
-      throw new HttpsError("internal", `ZeroGPT API returned status ${response.status}: ${response.data}`);
-    }
-    
-  } catch (error) {
-    console.error('ZeroGPT API Error:', error);
-    
-    if (error instanceof HttpsError) {
-      throw error;
-    }
-    
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    throw new HttpsError("internal", `Failed to check text for AI: ${errorMessage}`);
-  }
-});
-
-// Optimal Humanization Pipeline Function - NO AUTHENTICATION REQUIRED
-export const optimalHumanizePipeline = onCall(async (request) => {
-  // NO AUTHENTICATION CHECK - WORKS FOR EVERYONE
-  const { text, writingStyle, textLength, customInstructions } = request.data;
   
-  if (!text || typeof text !== 'string') {
-    throw new HttpsError("invalid-argument", "Text is required and must be a string");
-  }
-
-  if (text.trim().split(' ').length < 30) {
-    throw new HttpsError("invalid-argument", "Text must be at least 30 words");
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed' });
+    return;
   }
 
   try {
-    // Generate humanized text using OpenAI
-    const humanizedText = await generateHumanizedText(text, writingStyle, textLength, customInstructions);
+    const { text } = req.body.data || req.body;
     
-    // Check the humanized text with our AI detector
-    const detectionResult = await checkTextForAIInternal(humanizedText);
-    
-    // If AI score is too high, try to refine it
-    let finalText = humanizedText;
-    let finalScore = detectionResult.ai_percentage;
-    
-    if (detectionResult.ai_percentage > 15) {
-      const refinedResult = await refineText(finalText, detectionResult.ai_percentage, writingStyle, textLength, customInstructions);
-      finalText = refinedResult.text;
-      finalScore = refinedResult.score;
+    if (!text || typeof text !== 'string') {
+      res.status(400).json({ error: 'Text is required and must be a string' });
+      return;
     }
-    
-    // Save to user's history ONLY IF AUTHENTICATED
-    if (request.auth && request.auth.uid) {
-      try {
-        await db.collection('history').add({
-          userId: request.auth.uid,
-          originalText: text,
-          humanizedText: finalText,
-          timestamp: new Date(),
-          wordCount: text.split(' ').length,
-          writingStyle: writingStyle || 'balanced',
-          textLength: textLength || 'medium',
-          customInstructions: customInstructions || '',
-          aiScore: finalScore,
-        });
-      } catch (error) {
-        console.error('Error saving humanization to history:', error);
-        // Don't throw error here, just log it
-      }
+
+    if (text.trim().split(' ').length < 30) {
+      res.status(400).json({ error: 'Text must be at least 30 words' });
+      return;
     }
-    
-    return {
-      success: true,
-      originalText: text,
-      humanizedText: finalText,
-      aiScore: finalScore,
-      improvement: Math.max(0, 100 - finalScore),
-      method: 'optimal_pipeline',
-      iterations: detectionResult.ai_percentage > 15 ? 2 : 1
-    };
-    
-  } catch (error) {
-    console.error('Humanization Pipeline Error:', error);
-    
-    if (error instanceof HttpsError) {
-      throw error;
-    }
-    
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    throw new HttpsError("internal", `Failed to humanize text: ${errorMessage}`);
-  }
-});
 
-// Helper function to generate humanized text
-async function generateHumanizedText(text: string, writingStyle: string, textLength: string, customInstructions?: string): Promise<string> {
-  const styleInstructions = getStyleInstructions(writingStyle);
-  const lengthInstructions = getLengthInstructions(textLength);
-  
-  const prompt = `I need you to rework my text so it past AI detectors and sounds like it came straight from a real person, super natural and all. Can you make it feel like a human wrote it? Here's how to nail it:
-
-1. Mix up sentence lengths—some short and snappy, others longer and more detailed for a natural flow.
-2. Use everyday language, natural language.
-3. Toss in a few tiny imperfections, like a human might when they're writing casually.
-4. Swap out any AI-ish words for stuff you'd hear in a real writing.
-5. Keep the vocabulary varied, avoiding repetitive words to make it sound fresh and human.
-6. Weave in human-like thinking patterns
-7. Don't change the core meaning of the text
-
-${styleInstructions}
-${lengthInstructions}
-${customInstructions ? `Additional instructions: ${customInstructions}` : ''}
-
-[important] please output only the updated/revised text. thanks
-
-text: ${text}`;
-
-  try {
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4",
-      messages: [
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      temperature: 0.8,
-      max_tokens: Math.min(4000, text.length * 2),
-    });
-
-    return completion.choices[0]?.message?.content?.trim() || text;
-  } catch (error) {
-    console.error('OpenAI API Error:', error);
-    throw new Error('Failed to generate humanized text');
-  }
-}
-
-// Helper function to refine text if AI score is too high
-async function refineText(text: string, currentScore: number, writingStyle: string, textLength: string, customInstructions?: string): Promise<{text: string, score: number}> {
-  const styleInstructions = getStyleInstructions(writingStyle);
-  const lengthInstructions = getLengthInstructions(textLength);
-  
-  const prompt = `I need you to rework my text so it past AI detectors and sounds like it came straight from a real person, super natural and all. Can you make it feel like a human wrote it? Here's how to nail it:
-
-1. Mix up sentence lengths—some short and snappy, others longer and more detailed for a natural flow.
-2. Use everyday language, natural language.
-3. Toss in a few tiny imperfections, like a human might when they're writing casually.
-4. Swap out any AI-ish words for stuff you'd hear in a real writing.
-5. Keep the vocabulary varied, avoiding repetitive words to make it sound fresh and human.
-6. Weave in human-like thinking patterns
-7. Don't change the core meaning of the text
-
-The current AI detection score is ${currentScore}%. Make it even more human-like to get the score below 10%.
-
-${styleInstructions}
-${lengthInstructions}
-${customInstructions ? `Additional instructions: ${customInstructions}` : ''}
-
-[important] please output only the updated/revised text. thanks
-
-text: ${text}`;
-
-  try {
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4",
-      messages: [
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      temperature: 0.9,
-      max_tokens: Math.min(4000, text.length * 2),
-    });
-
-    const refinedText = completion.choices[0]?.message?.content?.trim() || text;
-    
-    // Check the refined text
-    const detectionResult = await checkTextForAIInternal(refinedText);
-    
-    return {
-      text: refinedText,
-      score: detectionResult.ai_percentage
-    };
-  } catch (error) {
-    console.error('OpenAI Refinement Error:', error);
-    return {
-      text: text,
-      score: currentScore
-    };
-  }
-}
-
-// Helper function to check text internally (without authentication)
-async function checkTextForAIInternal(text: string): Promise<any> {
-  try {
     const url = 'https://api.zerogpt.com/api/detect/detectText';
     
     const headers = {
@@ -326,7 +102,7 @@ async function checkTextForAIInternal(text: string): Promise<any> {
       const result = response.data;
       const data = result.data || {};
       
-      return {
+      const responseData = {
         success: true,
         is_ai: data.isHuman === 0,
         is_human: data.isHuman === 1,
@@ -338,50 +114,245 @@ async function checkTextForAIInternal(text: string): Promise<any> {
         highlighted_sentences: data.h || [],
         full_response: result
       };
+      
+      res.status(200).json({ result: responseData });
     } else {
-      throw new Error(`ZeroGPT API returned status ${response.status}`);
+      res.status(500).json({ error: `ZeroGPT API returned status ${response.status}: ${response.data}` });
     }
+    
   } catch (error) {
-    console.error('Internal AI Detection Error:', error);
-    return {
-      success: false,
-      is_ai: false,
-      is_human: false,
-      ai_percentage: 100,
-      feedback: '',
-      language: '',
-      text_words: 0,
-      ai_words: 0,
-      highlighted_sentences: [],
-      full_response: null
+    console.error('ZeroGPT API Error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    res.status(500).json({ error: `Failed to check text for AI: ${errorMessage}` });
+  }
+});
+
+// Advanced Humanization Function - HTTP Function (NO AUTHENTICATION REQUIRED)
+export const humanizeText = onRequest({secrets: [openaiApiKey], ...corsOptions}, async (req, res) => {
+  // Set CORS headers
+  res.set('Access-Control-Allow-Origin', 'https://humanizertext.xyz, https://humanizertext-551ee.web.app');
+  res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type');
+  
+  // Handle preflight request
+  if (req.method === 'OPTIONS') {
+    res.status(204).send('');
+    return;
+  }
+  
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed' });
+    return;
+  }
+
+  try {
+    const { 
+      text, 
+      writingStyle, 
+      textLength, 
+      keywordsToPreserve, 
+      readingLevel, 
+      toneGuardrails, 
+      prohibitedItems, 
+      personaLens, 
+      customRequest,
+      temperature,
+      top_p,
+      frequency_penalty,
+      presence_penalty
+    } = req.body.data || req.body;
+    
+    if (!text || typeof text !== 'string') {
+      res.status(400).json({ error: 'Text is required and must be a string' });
+      return;
+    }
+
+    if (text.trim().split(' ').length < 30) {
+      res.status(400).json({ error: 'Text must be at least 30 words' });
+      return;
+    }
+
+    // Generate humanized text using the new advanced method
+    const humanizedText = await generateAdvancedHumanizedText(
+      text, 
+      writingStyle, 
+      textLength, 
+      keywordsToPreserve, 
+      readingLevel, 
+      toneGuardrails, 
+      prohibitedItems, 
+      personaLens, 
+      customRequest,
+      temperature,
+      top_p,
+      frequency_penalty,
+      presence_penalty
+    );
+    
+    const responseData = {
+      success: true,
+      original_text: text,
+      humanized_text: humanizedText,
+      method: 'advanced_undetectable_prompt'
     };
+    
+    res.status(200).json({ result: responseData });
+    
+  } catch (error) {
+    console.error('Humanization Error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    res.status(500).json({ error: `Failed to humanize text: ${errorMessage}` });
+  }
+});
+
+// Advanced Humanization Function with Undetectable Prompt
+async function generateAdvancedHumanizedText(
+  text: string, 
+  writingStyle?: string, 
+  textLength?: string, 
+  keywordsToPreserve?: string, 
+  readingLevel?: string, 
+  toneGuardrails?: string, 
+  prohibitedItems?: string, 
+  personaLens?: string, 
+  customRequest?: string,
+  temperature?: number,
+  top_p?: number,
+  frequency_penalty?: number,
+  presence_penalty?: number
+): Promise<string> {
+  
+  // Get length instructions based on textLength
+  const lengthInstruction = getLengthInstructions(textLength || 'maintain');
+  
+  // Build the advanced prompt
+  const prompt = `
+Rewrite the TEXT with the same meaning but a different surface form. Follow this style rubric:
+A. Perplexity (High)
+* Use unexpected yet fitting verbs and nouns; avoid stock phrases.
+* Replace at least 30% of content words with strong synonyms or rephrasings.
+* Avoid formulaic connectors ("in conclusion," "overall," etc.).
+B. Burstiness (High)
+* Sentence mix:
+    * 40–60% short (≤10 words),
+    * 25–40% medium (11–20 words),
+    * 10–20% long (28–45 words).
+* Include 1 fragment and 1 parenthetical or brief self-correction.
+C. Consistency (Slightly Lower)
+* Allow up to 2 mild shifts in tone/tempo (e.g., a quick aside or rhetorical question).
+* Keep grammar readable; small, human imperfections are acceptable.
+D. Anti-Repetition
+* Do not repeat distinctive phrases, sentence starters, or rhetorical patterns.
+* Avoid near-duplicates and synonym ping-pong (e.g., cycling "rapid/fast/quick").
+E. Fidelity
+* Keep all facts, relationships, and logical order intact. Do not add claims.
+* Preserve core meaning of the text,named entities, quantities, and cause-effect links.
+Output Rules (IMPORTANT)
+* Return only the rewritten text, no commentary.
+* ${lengthInstruction}
+* DO NOT INCLUDE EM DASHES "—" ANYWHERE IN YOUR OUTPUT AT ALL!
+TEXT: ${text}
+
+Optional Add-Ons (If nothing is listed, skip over it)
+* Keywords to preserve verbatim: ${keywordsToPreserve || ''}
+* Reading level target: ${readingLevel || ''}
+* Tone guardrails: ${toneGuardrails || ''}
+* Prohibited items: clichés, emojis, corporate buzzwords, em dashes (—)${prohibitedItems ? `, ${prohibitedItems}` : ''}.
+* Persona lens: ${personaLens || ''}
+* Writing Style: ${writingStyle || ''}
+* Custom Request: ${customRequest || ''}
+Common pitfalls to avoid
+* MAKE SURE TO FOLLOW THE OUTPUT RULES STRICTLY! DO NOT BREAK THEM! THIS IS VERY VITAL!
+* Overdoing "quirkiness" so meaning drifts.
+* Repeating the same opening rhythm ("X is…," "Y is…").
+* Adding new facts to sound "human".
+* Making every sentence long—burstiness needs contrast, not uniform length.
+
+COMPREHENSIVE WRITING GUIDELINES:
+
+DO:
+✓ Use varied sentence structures (short, medium, long)
+✓ Include natural transitions and connectors
+✓ Add subtle human imperfections (minor hesitations, corrections)
+✓ Vary vocabulary with strong synonyms
+✓ Include rhetorical questions or brief asides
+✓ Use active voice when possible
+✓ Maintain logical flow and coherence
+✓ Preserve all facts, numbers, and entities exactly
+✓ Keep the same core meaning and message
+✓ Use natural, conversational tone
+✓ Include occasional fragments for rhythm
+✓ Vary paragraph lengths
+✓ Use specific, concrete language
+✓ Include subtle emotional undertones
+✓ Maintain professional credibility
+
+DON'T:
+✗ Use repetitive sentence starters
+✗ Include em dashes (—) anywhere
+✗ Add new facts or claims
+✗ Use corporate buzzwords or clichés
+✗ Make every sentence the same length
+✗ Overuse the same transition words
+✗ Include emojis or symbols
+✗ Change the meaning or facts
+✗ Use overly complex jargon
+✗ Make every sentence long
+✗ Include unnecessary qualifiers
+✗ Use passive voice excessively
+✗ Add commentary or explanations
+✗ Include meta-references to the rewriting
+✗ Use formulaic academic phrases
+✗ Include redundant information
+✗ Make the text sound robotic or AI-generated
+`;
+
+  try {
+    // Initialize OpenAI with the secret
+    const openai = new OpenAI({
+      apiKey: openaiApiKey.value(),
+    });
+    
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4.1",
+      messages: [
+        {
+          role: "system",
+          content: (
+            "You are a precise line editor. Rewrite the user's text with the same meaning. Increase lexical surprise " +
+            "and vary sentence lengths; include one short fragment. Avoid repeating " +
+            "distinctive phrases or sentence starters. Keep facts, entities, and logic. " +
+            "Slightly relaxed tone is OK, but stay readable. Output only the rewrite."
+          )
+        },
+        { role: "user", content: prompt }
+      ],
+      temperature: temperature || 0.95,
+      top_p: top_p || 1.0,
+      frequency_penalty: frequency_penalty || 0.6,
+      presence_penalty: presence_penalty || 0.1,
+      max_tokens: 1000
+    });
+
+    return completion.choices[0]?.message?.content?.trim() || text;
+  } catch (error) {
+    console.error('OpenAI API Error:', error);
+    throw new Error('Failed to generate humanized text');
   }
 }
 
-// Helper function to get style instructions
-function getStyleInstructions(style: string): string {
-  switch (style) {
-    case 'creative':
-      return 'Make the writing more creative and expressive with vivid descriptions and imaginative language.';
-    case 'professional':
-      return 'Keep the tone professional and formal while maintaining natural flow.';
-    case 'casual':
-      return 'Make the writing more casual and conversational, like talking to a friend.';
-    case 'academic':
-      return 'Maintain an academic tone with proper structure and formal language.';
-    default:
-      return 'Keep a balanced, natural writing style.';
-  }
-}
+
 
 // Helper function to get length instructions
 function getLengthInstructions(length: string): string {
   switch (length) {
     case 'shorter':
-      return 'Make the text more concise while keeping all the important information.';
+      return 'Length: less than 15% of the original.';
     case 'longer':
-      return 'Expand the text with more details and explanations while keeping it natural.';
+      return 'Length: More than 15% of the original.';
+    case 'maintain':
     default:
-      return 'Keep the text length similar to the original.';
+      return 'Length: within ±10% of the original.';
   }
 }
+

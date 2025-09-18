@@ -34,13 +34,11 @@ firebase-debug.*.log
 __pycache__/
 *.py[cod]
 *$py.class
-*.so
-.Python
 venv/
 env/
-ENV/
 
 # Logs
+logs
 *.log
 
 # Runtime data
@@ -91,3 +89,6 @@ jspm_packages/
 
 # DynamoDB Local files
 .dynamodb/
+
+# TernJS port file
+.tern-port
