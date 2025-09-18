@@ -1,0 +1,13 @@
+{
+  "name": "humanizertext",
+  "version": "1.0.0",
+  "description": "AI Text Humanizer SaaS",
+  "scripts": {
+    "build": "cd humanizer-frontend && npm install && npm run build",
+    "start": "cd humanizer-frontend && npm start",
+    "dev": "cd humanizer-frontend && npm start"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

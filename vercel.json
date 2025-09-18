@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "buildCommand": "cd humanizer-frontend && npm install && npm run build",
+  "buildCommand": "npm run build",
   "outputDirectory": "humanizer-frontend/build",
-  "installCommand": "cd humanizer-frontend && npm install",
+  "installCommand": "npm install",
   "framework": "create-react-app",
   "rewrites": [
     {
