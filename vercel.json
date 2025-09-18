@@ -1,7 +1,22 @@
 {
   "version": 2,
-  "buildCommand": "cd humanizer-frontend && npm install && npm run build",
-  "outputDirectory": "humanizer-frontend/build",
-  "installCommand": "cd humanizer-frontend && npm install",
-  "framework": "create-react-app"
+  "builds": [
+    {
+      "src": "humanizer-frontend/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "build"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/static/(.*)",
+      "dest": "/static/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ]
 }
