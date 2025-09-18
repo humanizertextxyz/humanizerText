@@ -22,7 +22,7 @@ export const STRIPE_PRICES = {
 // Function to create checkout session
 export const createCheckoutSession = async (priceId: string, customerEmail: string, couponCode?: string) => {
   try {
-    const response = await fetch('https://createcheckoutsession-qq6lep6f5a-uc.a.run.app', {
+    const response = await fetch(process.env.REACT_APP_CREATE_CHECKOUT_URL!, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

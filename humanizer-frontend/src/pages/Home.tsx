@@ -103,7 +103,11 @@ interface DetectionService {
 
 // Call HTTP functions directly
 const callHttpFunction = async (functionName: string, data: any) => {
-  const response = await fetch(`https://${functionName === 'humanizeText' ? 'humanizetext' : 'detectaitext'}-qq6lep6f5a-uc.a.run.app`, {
+  const functionUrl = functionName === 'humanizeText' 
+    ? process.env.REACT_APP_HUMANIZE_FUNCTION_URL 
+    : process.env.REACT_APP_DETECT_AI_FUNCTION_URL;
+    
+  const response = await fetch(functionUrl!, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

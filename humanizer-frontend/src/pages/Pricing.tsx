@@ -86,7 +86,7 @@ const Pricing: React.FC = () => {
 
     setCouponLoading(true);
     try {
-      const response = await fetch('https://validatecoupon-qq6lep6f5a-uc.a.run.app', {
+      const response = await fetch(process.env.REACT_APP_VALIDATE_COUPON_URL!, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -269,42 +269,42 @@ Common pitfalls to avoid
 * Making every sentence long—burstiness needs contrast, not uniform length.
 
 COMPREHENSIVE WRITING GUIDELINES:
-
 DO:
-✓ Use varied sentence structures (short, medium, long)
-✓ Include natural transitions and connectors
-✓ Add subtle human imperfections (minor hesitations, corrections)
-✓ Vary vocabulary with strong synonyms
-✓ Include rhetorical questions or brief asides
-✓ Use active voice when possible
-✓ Maintain logical flow and coherence
-✓ Preserve all facts, numbers, and entities exactly
-✓ Keep the same core meaning and message
-✓ Use natural, conversational tone
-✓ Include occasional fragments for rhythm
-✓ Vary paragraph lengths
-✓ Use specific, concrete language
-✓ Include subtle emotional undertones
-✓ Maintain professional credibility
+Have tiny unnoticeable imperfections
 
-DON'T:
-✗ Use repetitive sentence starters
-✗ Include em dashes (—) anywhere
-✗ Add new facts or claims
-✗ Use corporate buzzwords or clichés
-✗ Make every sentence the same length
-✗ Overuse the same transition words
-✗ Include emojis or symbols
-✗ Change the meaning or facts
-✗ Use overly complex jargon
-✗ Make every sentence long
-✗ Include unnecessary qualifiers
-✗ Use passive voice excessively
-✗ Add commentary or explanations
-✗ Include meta-references to the rewriting
-✗ Use formulaic academic phrases
-✗ Include redundant information
-✗ Make the text sound robotic or AI-generated
+DON'T ANY OF THIS:   
+AI text similarities
+Formulaic Structure
+The text follows a rigid, structured format with clear transitions, headings, and connectors, making it feel predictable and formulaic.
+Robotic or Impersonal Tone
+The writing style is formal and polished, often impersonal and detached, focusing on clarity but lacking warmth or personality.
+Artificial Simplicity
+The sentence structure is overly simple and conversational, sometimes starting with conjunctions, but lacking nuance.
+Overly Simple or Unimaginative Writing
+The text is linear, straightforward, and grammatically correct but lacks creativity, depth, and variation in style.
+Speculative or Uncertain Language
+The text leans on speculative or hypothetical elements, often showing uncertainty and avoiding firm conclusions.
+Technical Jargon
+Complex sentences with multiple clauses rely heavily on advanced vocabulary and jargon, which can obscure readability.
+Dry or Functional Vocabulary
+Word choice is functional and event-focused, prioritizing clarity but limiting imagery or personal expression.
+Precision Over Naturalness
+Word choice prioritizes clarity and sophistication, sometimes at the cost of natural flow.
+Predictable Syntax & Rhythm
+The text favors repetitive structures and declarative sentences, leading to a steady and predictable rhythm.
+Mechanical Style
+The writing lacks literary devices or imaginative turns, focusing instead on precision and structure.
+Rich Yet Shallow
+The vocabulary is varied and sophisticated but lacks emotional depth and spontaneity.
+
+DON'T USE THESE WORDS/PHRASES:
+"pushing boundaries"
+"swirling"
+"challenges our understanding"
+"Insights"
+"Plays a crucial role"
+"highlights the importance"
+"Crucial"
 `;
 
   try {
