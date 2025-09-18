@@ -497,32 +497,22 @@ const Guide: React.FC = () => {
                     <Card sx={{ bgcolor: 'rgba(255, 255, 255, 0.05)', mb: 3 }}>
                       <CardContent>
                         <Typography variant="h6" sx={{ color: 'white', mb: 2 }}>
-                          🔥 temperature
+                          🔥 Creativity
                         </Typography>
                         <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.8)', mb: 2 }}>
                           Controls how creative and varied the AI's word choices are. Higher values = more creative but potentially less coherent.
                         </Typography>
-                        <Box sx={{ p: 2, bgcolor: 'rgba(255, 255, 255, 0.03)', borderRadius: 1 }}>
-                          <Typography variant="body2" sx={{ color: '#FFD700', fontWeight: 600 }}>
-                            Default: 0.95
-                          </Typography>
-                        </Box>
                       </CardContent>
                     </Card>
 
                     <Card sx={{ bgcolor: 'rgba(255, 255, 255, 0.05)' }}>
                       <CardContent>
                         <Typography variant="h6" sx={{ color: 'white', mb: 2 }}>
-                          📊 top_p
+                          📊 Diversity
                         </Typography>
                         <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.8)', mb: 2 }}>
                           Controls the diversity of word choices. Lower values focus on more likely words, higher values consider more options.
                         </Typography>
-                        <Box sx={{ p: 2, bgcolor: 'rgba(255, 255, 255, 0.03)', borderRadius: 1 }}>
-                          <Typography variant="body2" sx={{ color: '#FFD700', fontWeight: 600 }}>
-                            Default: 1.0
-                          </Typography>
-                        </Box>
                       </CardContent>
                     </Card>
                   </Box>
@@ -531,32 +521,22 @@ const Guide: React.FC = () => {
                     <Card sx={{ bgcolor: 'rgba(255, 255, 255, 0.05)', mb: 3 }}>
                       <CardContent>
                         <Typography variant="h6" sx={{ color: 'white', mb: 2 }}>
-                          🔄 frequency_penalty
+                          🔄 Reduce Repeats
                         </Typography>
                         <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.8)', mb: 2 }}>
                           Prevents the AI from repeating the same words or phrases too often. Higher values = less repetition.
                         </Typography>
-                        <Box sx={{ p: 2, bgcolor: 'rgba(255, 255, 255, 0.03)', borderRadius: 1 }}>
-                          <Typography variant="body2" sx={{ color: '#FFD700', fontWeight: 600 }}>
-                            Default: 0.6
-                          </Typography>
-                        </Box>
                       </CardContent>
                     </Card>
 
                     <Card sx={{ bgcolor: 'rgba(255, 255, 255, 0.05)' }}>
                       <CardContent>
                         <Typography variant="h6" sx={{ color: 'white', mb: 2 }}>
-                          🌟 presence_penalty
+                          🌟 Explore New Topics
                         </Typography>
                         <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.8)', mb: 2 }}>
                           Encourages the AI to introduce new topics or concepts. Higher values = more topic diversity.
                         </Typography>
-                        <Box sx={{ p: 2, bgcolor: 'rgba(255, 255, 255, 0.03)', borderRadius: 1 }}>
-                          <Typography variant="body2" sx={{ color: '#FFD700', fontWeight: 600 }}>
-                            Default: 0.1
-                          </Typography>
-                        </Box>
                       </CardContent>
                     </Card>
                   </Box>
