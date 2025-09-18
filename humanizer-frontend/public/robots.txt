@@ -1,0 +1,22 @@
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://humanizertext.xyz/sitemap.xml
+
+# Disallow private areas
+Disallow: /account
+Disallow: /history
+Disallow: /admin
+
+# Allow important pages
+Allow: /
+Allow: /pricing
+Allow: /guide
+Allow: /login
+Allow: /signup
+Allow: /terms
+Allow: /privacy
+
+# Crawl delay (optional)
+Crawl-delay: 1

@@ -1,0 +1,923 @@
+import React, { useState } from 'react';
+import {
+  Container,
+  Box,
+  Typography,
+  TextField,
+  Button,
+  Paper,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Chip,
+  LinearProgress,
+  Alert,
+  Collapse,
+  IconButton,
+  Snackbar,
+  useMediaQuery,
+  useTheme,
+} from '@mui/material';
+import {
+  ContentCopy,
+  AutoFixHigh,
+  CheckCircle,
+  ExpandMore,
+  ExpandLess,
+  Lock as LockIcon,
+} from '@mui/icons-material';
+import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import { canUserProcessText, getWordsRemaining, getSubscriptionTier } from '../utils/subscription';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../firebase/config';
+
+const Home: React.FC = () => {
+  const { currentUser, userData, updateUserData } = useAuth();
+  const navigate = useNavigate();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  
+  const [inputText, setInputText] = useState('');
+  const [outputText, setOutputText] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [writingStyle, setWritingStyle] = useState('professional');
+  const [textLength, setTextLength] = useState('maintain');
+  const [customInstructions, setCustomInstructions] = useState('');
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [aiCheckText, setAiCheckText] = useState('');
+  const [aiCheckScore, setAiCheckScore] = useState<number | null>(null);
+  const [isAiChecking, setIsAiChecking] = useState(false);
+  const [copySuccess, setCopySuccess] = useState(false);
+
+  // Get user's current usage and limits
+  const userTier = userData?.subscription.type || 'free';
+  const dailyWordsUsed = userData?.usage.dailyWordsUsed || 0;
+  const monthlyWordsUsed = userData?.usage.monthlyWordsUsed || 0;
+  const wordsRemaining = getWordsRemaining(userTier, dailyWordsUsed, monthlyWordsUsed);
+  const tier = getSubscriptionTier(userTier);
+
+  // Word counters
+  const inputWordCount = inputText.trim() ? inputText.trim().split(/\s+/).length : 0;
+  const aiCheckWordCount = aiCheckText.trim() ? aiCheckText.trim().split(/\s+/).length : 0;
+
+  const handleHumanize = async () => {
+    if (!inputText.trim()) return;
+    
+    const wordCount = inputText.trim().split(/\s+/).length;
+    
+    // Check if user can process this text
+    const canProcess = canUserProcessText(userTier, wordCount, dailyWordsUsed, monthlyWordsUsed);
+    
+    if (!canProcess.canProcess) {
+      if (!currentUser) {
+        // Redirect to login if not authenticated
+        navigate('/login');
+        return;
+      } else {
+        // Show upgrade prompt
+        navigate('/pricing');
+        return;
+      }
+    }
+    
+    setIsProcessing(true);
+    setShowSuccess(false);
+    
+    // Simulate API call
+    setTimeout(async () => {
+      const humanizedText = inputText + ' (Humanized version)';
+      setOutputText(humanizedText);
+      setIsProcessing(false);
+      setShowSuccess(true);
+      
+      // Update user's word usage if authenticated
+      if (currentUser && userData) {
+        const newDailyWords = userTier === 'free' ? dailyWordsUsed + wordCount : dailyWordsUsed;
+        const newMonthlyWords = userTier !== 'free' ? monthlyWordsUsed + wordCount : monthlyWordsUsed;
+        
+        await updateUserData({
+          usage: {
+            ...userData.usage,
+            dailyWordsUsed: newDailyWords,
+            monthlyWordsUsed: newMonthlyWords,
+          }
+        });
+        
+        // Save to history
+        try {
+          await addDoc(collection(db, 'history'), {
+            userId: currentUser.uid,
+            originalText: inputText,
+            humanizedText: humanizedText,
+            timestamp: serverTimestamp(),
+            wordCount: wordCount,
+            writingStyle: writingStyle,
+            textLength: textLength,
+            customInstructions: customInstructions || null,
+          });
+        } catch (error) {
+          console.error('Error saving to history:', error);
+        }
+      }
+    }, 2000);
+  };
+
+  const handleAiCheck = async () => {
+    if (!aiCheckText.trim() || aiCheckText.split(' ').length < 30) return;
+    
+    setIsAiChecking(true);
+    
+    // Simulate API call
+    setTimeout(() => {
+      setAiCheckScore(Math.floor(Math.random() * 100));
+      setIsAiChecking(false);
+    }, 2000);
+  };
+
+  const getAiCheckColor = (score: number): string => {
+    if (score < 30) return '#4ade80';
+    if (score < 70) return '#fbbf24';
+    return '#ef4444';
+  };
+
+  const getAiCheckLabel = (score: number): string => {
+    if (score < 30) return 'Human-like';
+    if (score < 70) return 'Mixed';
+    return 'AI-generated';
+  };
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopySuccess(true);
+    } catch (error) {
+      console.error('Failed to copy text:', error);
+    }
+  };
+
+  const handleAdvancedOptionsClick = () => {
+    if (!currentUser) {
+      navigate('/login');
+      return;
+    }
+    setShowAdvanced(!showAdvanced);
+  };
+
+  const handleStyleChange = (value: string) => {
+    if (!currentUser) {
+      navigate('/login');
+      return;
+    }
+    setWritingStyle(value);
+  };
+
+  const handleLengthChange = (value: string) => {
+    if (!currentUser) {
+      navigate('/login');
+      return;
+    }
+    setTextLength(value);
+  };
+
+  return (
+    <Box sx={{ 
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%)',
+      py: { xs: 2, md: 4 },
+      px: { xs: 1, md: 0 },
+    }}>
+      <Container maxWidth="lg">
+        {/* Main Title */}
+        <Box textAlign="center" mb={{ xs: 4, md: 6 }}>
+          <Typography
+            variant="h2"
+            component="h1"
+            sx={{
+              fontWeight: 800,
+              fontSize: { xs: '2rem', md: '3.5rem' },
+              background: 'linear-gradient(45deg, #ffffff 30%, #fbbf24 90%)',
+              backgroundClip: 'text',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              textShadow: '0 4px 8px rgba(0,0,0,0.3)',
+              mb: 2,
+            }}
+          >
+            Humanizer Text
+          </Typography>
+          <Typography
+            variant="h5"
+            color="text.secondary"
+            sx={{
+              fontWeight: 400,
+              opacity: 0.8,
+              maxWidth: 600,
+              mx: 'auto',
+              fontSize: { xs: '1rem', md: '1.3rem' },
+            }}
+          >
+            Transform AI-generated content into natural, human-like text that passes all detection tools
+          </Typography>
+        </Box>
+
+        {/* Usage Information - Only show for logged-in users */}
+        {currentUser && userData && (
+          <Box mb={{ xs: 3, md: 4 }} textAlign="center">
+            <Paper
+              elevation={0}
+              sx={{
+                p: { xs: 2, md: 3 },
+                background: 'rgba(26, 26, 46, 0.6)',
+                backdropFilter: 'blur(10px)',
+                border: '1px solid rgba(99, 102, 241, 0.2)',
+                borderRadius: 3,
+                display: 'inline-block',
+              }}
+            >
+              <Typography variant="h6" sx={{ color: 'white', mb: 2, fontSize: { xs: '1rem', md: '1.2rem' } }}>
+                {tier.name} Plan
+              </Typography>
+              <Box display="flex" gap={{ xs: 2, md: 3 }} justifyContent="center" flexWrap="wrap">
+                {userTier === 'free' ? (
+                  <Box textAlign="center">
+                    <Typography variant="h4" sx={{ color: '#4ade80', fontWeight: 700, fontSize: { xs: '1.8rem', md: '2.5rem' } }}>
+                      {wordsRemaining.daily}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.8rem', md: '0.9rem' } }}>
+                      Words Left Today
+                    </Typography>
+                  </Box>
+                ) : (
+                  <Box textAlign="center">
+                    <Typography variant="h4" sx={{ color: '#4ade80', fontWeight: 700, fontSize: { xs: '1.8rem', md: '2.5rem' } }}>
+                      {wordsRemaining.monthly}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.8rem', md: '0.9rem' } }}>
+                      Words Left This Month
+                    </Typography>
+                  </Box>
+                )}
+                <Box textAlign="center">
+                  <Typography variant="h4" sx={{ color: '#fbbf24', fontWeight: 700, fontSize: { xs: '1.8rem', md: '2.5rem' } }}>
+                    {tier.wordsPerProcess === 0 ? '∞' : tier.wordsPerProcess}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.8rem', md: '0.9rem' } }}>
+                    Max Per Process
+                  </Typography>
+                </Box>
+              </Box>
+            </Paper>
+          </Box>
+        )}
+
+        {/* Main Humanizer Section */}
+        <Paper 
+          elevation={0} 
+          sx={{ 
+            p: { xs: 2, md: 4 },
+            background: 'rgba(26, 26, 46, 0.8)',
+            backdropFilter: 'blur(10px)',
+            border: '1px solid rgba(99, 102, 241, 0.2)',
+            borderRadius: 4,
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+            mb: { xs: 3, md: 4 },
+          }}
+        >
+          <Box display="flex" flexDirection={{ xs: 'column', md: 'row' }} gap={4}>
+            {/* Input Section */}
+            <Box flex={1}>
+              <Box display="flex" alignItems="center" justifyContent="space-between" mb={2} flexDirection={{ xs: 'column', sm: 'row' }} gap={1}>
+                <Typography variant="h6" sx={{ color: 'white', fontWeight: 600, fontSize: { xs: '1rem', md: '1.2rem' } }}>
+                  Original Text
+                </Typography>
+                <Box display="flex" alignItems="center" gap={2} flexWrap="wrap" justifyContent={{ xs: 'center', sm: 'flex-end' }}>
+                  {/* Word Counter */}
+                  <Chip
+                    label={`${inputWordCount} words`}
+                    size="small"
+                    sx={{
+                      backgroundColor: 'rgba(99, 102, 241, 0.2)',
+                      color: '#6366f1',
+                      fontWeight: 600,
+                      fontSize: { xs: '0.7rem', md: '0.75rem' },
+                    }}
+                  />
+                  {/* User Usage Counter - Only show for logged-in users */}
+                  {currentUser && userData && (
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1,
+                        px: 2,
+                        py: 0.5,
+                        backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                        borderRadius: 3,
+                        border: '1px solid rgba(99, 102, 241, 0.2)',
+                        position: 'relative',
+                        '&::after': {
+                          content: '""',
+                          position: 'absolute',
+                          right: 8,
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          width: 8,
+                          height: 8,
+                          backgroundColor: '#4ade80',
+                          borderRadius: '50%',
+                          animation: 'pulse 2s infinite',
+                          '@keyframes pulse': {
+                            '0%': { opacity: 1 },
+                            '50%': { opacity: 0.3 },
+                            '100%': { opacity: 1 },
+                          },
+                        },
+                      }}
+                    >
+                      <Typography variant="body2" sx={{ color: '#4ade80', fontWeight: 600, mr: 1, fontSize: { xs: '0.7rem', md: '0.8rem' } }}>
+                        {userTier === 'free' 
+                          ? `${wordsRemaining.daily} words left (Daily)`
+                          : `${wordsRemaining.monthly} words left (Monthly)`
+                        }
+                      </Typography>
+                    </Box>
+                  )}
+                  {/* Free user indicator */}
+                  {!currentUser && (
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1,
+                        px: 2,
+                        py: 0.5,
+                        backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                        borderRadius: 3,
+                        border: '1px solid rgba(99, 102, 241, 0.2)',
+                        position: 'relative',
+                        '&::after': {
+                          content: '""',
+                          position: 'absolute',
+                          right: 8,
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          width: 8,
+                          height: 8,
+                          backgroundColor: '#4ade80',
+                          borderRadius: '50%',
+                          animation: 'pulse 2s infinite',
+                          '@keyframes pulse': {
+                            '0%': { opacity: 1 },
+                            '50%': { opacity: 0.3 },
+                            '100%': { opacity: 1 },
+                          },
+                        },
+                      }}
+                    >
+                      <Typography variant="body2" sx={{ color: '#4ade80', fontWeight: 600, mr: 1, fontSize: { xs: '0.7rem', md: '0.8rem' } }}>
+                        1500 words left (Daily)
+                      </Typography>
+                    </Box>
+                  )}
+                </Box>
+              </Box>
+              
+              <TextField
+                multiline
+                rows={isMobile ? 8 : 12}
+                fullWidth
+                placeholder="Paste your AI-generated text here..."
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                variant="outlined"
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    backgroundColor: 'rgba(255,255,255,0.03)',
+                    borderRadius: 2,
+                    '& fieldset': {
+                      borderColor: 'rgba(255,255,255,0.1)',
+                    },
+                    '&:hover fieldset': {
+                      borderColor: 'rgba(255,255,255,0.2)',
+                    },
+                    '&.Mui-focused fieldset': {
+                      borderColor: '#6366f1',
+                      borderWidth: 2,
+                    },
+                  },
+                  '& .MuiInputBase-input': {
+                    color: 'white',
+                    fontSize: { xs: '0.9rem', md: '0.95rem' },
+                  },
+                  '& .MuiInputBase-input::placeholder': {
+                    color: 'rgba(255,255,255,0.4)',
+                    opacity: 1,
+                  },
+                }}
+              />
+            </Box>
+
+            {/* Output Section */}
+            <Box flex={1}>
+              <Box display="flex" alignItems="center" justifyContent="flex-end" mb={2}>
+                <Typography variant="h6" sx={{ color: 'white', fontWeight: 600, fontSize: { xs: '1rem', md: '1.2rem' } }}>
+                  Humanized Text
+                </Typography>
+                {outputText && (
+                  <IconButton
+                    onClick={() => copyToClipboard(outputText)}
+                    size="small"
+                    sx={{ 
+                      color: '#6366f1',
+                      ml: 1,
+                      '&:hover': {
+                        backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                      }
+                    }}
+                  >
+                    <ContentCopy />
+                  </IconButton>
+                )}
+              </Box>
+              
+              <TextField
+                multiline
+                rows={isMobile ? 8 : 12}
+                fullWidth
+                placeholder="Your humanized text will appear here..."
+                value={outputText}
+                variant="outlined"
+                InputProps={{
+                  readOnly: true,
+                }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    backgroundColor: 'rgba(255,255,255,0.03)',
+                    borderRadius: 2,
+                    '& fieldset': {
+                      borderColor: 'rgba(255,255,255,0.1)',
+                    },
+                  },
+                  '& .MuiInputBase-input': {
+                    color: 'white',
+                    fontSize: { xs: '0.9rem', md: '0.95rem' },
+                  },
+                  '& .MuiInputBase-input::placeholder': {
+                    color: 'rgba(255,255,255,0.4)',
+                    opacity: 1,
+                  },
+                }}
+              />
+            </Box>
+          </Box>
+
+          {/* Configuration Options */}
+          <Box mt={4} display="flex" flexDirection={{ xs: 'column', md: 'row' }} gap={3}>
+            <FormControl sx={{ minWidth: { xs: '100%', md: 150 } }}>
+              <InputLabel sx={{ color: 'rgba(255,255,255,0.7)' }}>Writing Style</InputLabel>
+              <Select
+                value={writingStyle}
+                onChange={(e) => handleStyleChange(e.target.value)}
+                label="Writing Style"
+                startAdornment={!currentUser && <LockIcon sx={{ color: 'rgba(255,255,255,0.3)', mr: 1 }} />}
+                sx={{
+                  color: 'white',
+                  '& .MuiOutlinedInput-notchedOutline': {
+                    borderColor: 'rgba(255,255,255,0.1)',
+                  },
+                  '&:hover .MuiOutlinedInput-notchedOutline': {
+                    borderColor: 'rgba(255,255,255,0.2)',
+                  },
+                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                    borderColor: '#6366f1',
+                  },
+                  '& .MuiSvgIcon-root': {
+                    color: 'rgba(255,255,255,0.7)',
+                  },
+                }}
+              >
+                <MenuItem value="professional">Professional</MenuItem>
+                <MenuItem value="casual">Casual</MenuItem>
+                <MenuItem value="academic">Academic</MenuItem>
+                <MenuItem value="creative">Creative</MenuItem>
+              </Select>
+            </FormControl>
+
+            <FormControl sx={{ minWidth: { xs: '100%', md: 150 } }}>
+              <InputLabel sx={{ color: 'rgba(255,255,255,0.7)' }}>Text Length</InputLabel>
+              <Select
+                value={textLength}
+                onChange={(e) => handleLengthChange(e.target.value)}
+                label="Text Length"
+                startAdornment={!currentUser && <LockIcon sx={{ color: 'rgba(255,255,255,0.3)', mr: 1 }} />}
+                sx={{
+                  color: 'white',
+                  '& .MuiOutlinedInput-notchedOutline': {
+                    borderColor: 'rgba(255,255,255,0.1)',
+                  },
+                  '&:hover .MuiOutlinedInput-notchedOutline': {
+                    borderColor: 'rgba(255,255,255,0.2)',
+                  },
+                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                    borderColor: '#6366f1',
+                  },
+                  '& .MuiSvgIcon-root': {
+                    color: 'rgba(255,255,255,0.7)',
+                  },
+                }}
+              >
+                <MenuItem value="maintain">Maintain</MenuItem>
+                <MenuItem value="expand">Expand</MenuItem>
+                <MenuItem value="compress">Compress</MenuItem>
+              </Select>
+            </FormControl>
+
+            <Box flex={1} />
+            
+            <Button
+              variant="contained"
+              size="large"
+              onClick={handleHumanize}
+              disabled={!inputText.trim() || isProcessing}
+              startIcon={<AutoFixHigh />}
+              sx={{
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                height: '56px',
+                width: '100%',
+                borderRadius: 2,
+                textTransform: 'uppercase',
+                fontWeight: 700,
+                fontSize: { xs: '0.8rem', md: '0.9rem' },
+                letterSpacing: '0.5px',
+                boxShadow: '0 4px 20px rgba(102, 126, 234, 0.4)',
+                '&:hover': {
+                  background: 'linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%)',
+                  boxShadow: '0 6px 25px rgba(102, 126, 234, 0.6)',
+                  transform: 'translateY(-1px)',
+                },
+                '&:disabled': {
+                  background: 'rgba(255,255,255,0.1)',
+                  color: 'rgba(255,255,255,0.3)',
+                },
+              }}
+            >
+              {isProcessing ? 'Humanizing...' : 'Humanize Text'}
+            </Button>
+          </Box>
+
+          {/* Advanced Options Toggle */}
+          <Box mt={3} display="flex" alignItems="center">
+            <Button
+              onClick={handleAdvancedOptionsClick}
+              endIcon={showAdvanced ? <ExpandLess /> : <ExpandMore />}
+              startIcon={!currentUser && <LockIcon />}
+              sx={{ 
+                color: 'white', 
+                textTransform: 'none',
+                fontWeight: 500,
+                fontSize: { xs: '0.8rem', md: '0.9rem' },
+                '&:hover': {
+                  backgroundColor: 'rgba(255,255,255,0.1)',
+                }
+              }}
+            >
+              Advanced Options {!currentUser && '(Login Required)'}
+            </Button>
+          </Box>
+
+          {/* Advanced Options Collapse */}
+          <Collapse in={showAdvanced}>
+            <Box mt={2}>
+              <Typography variant="h6" gutterBottom sx={{ color: 'white', fontWeight: 600, fontSize: { xs: '1rem', md: '1.2rem' } }}>
+                Advanced Options
+              </Typography>
+              <TextField
+                fullWidth
+                multiline
+                rows={3}
+                placeholder="Add any specific requirements or guidelines for the humanization process..."
+                value={customInstructions}
+                onChange={(e) => setCustomInstructions(e.target.value)}
+                variant="outlined"
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    backgroundColor: 'rgba(255,255,255,0.03)',
+                    borderRadius: 2,
+                    '& fieldset': {
+                      borderColor: 'rgba(255,255,255,0.1)',
+                    },
+                    '&:hover fieldset': {
+                      borderColor: 'rgba(255,255,255,0.2)',
+                    },
+                    '&.Mui-focused fieldset': {
+                      borderColor: '#6366f1',
+                      borderWidth: 2,
+                    },
+                  },
+                  '& .MuiInputBase-input': {
+                    color: 'white',
+                    fontSize: { xs: '0.9rem', md: '1rem' },
+                  },
+                  '& .MuiInputBase-input::placeholder': {
+                    color: 'rgba(255,255,255,0.4)',
+                    opacity: 1,
+                  },
+                }}
+              />
+            </Box>
+          </Collapse>
+
+          {/* Success Message */}
+          {showSuccess && (
+            <Box mt={3} display="flex" alignItems="center" gap={2} flexDirection={{ xs: 'column', sm: 'row' }}>
+              <Alert 
+                severity="success" 
+                icon={<CheckCircle />}
+                sx={{ 
+                  backgroundColor: 'rgba(76, 175, 80, 0.15)',
+                  color: 'white',
+                  border: '1px solid rgba(76, 175, 80, 0.3)',
+                  borderRadius: 2,
+                }}
+              >
+                Success!
+              </Alert>
+              <Box display="flex" alignItems="center" gap={1}>
+                <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.7rem', md: '0.8rem' } }}>CLOUDFLARE</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.7rem', md: '0.8rem' } }}>Privacy • Terms</Typography>
+              </Box>
+            </Box>
+          )}
+
+          {/* Processing Indicator */}
+          {isProcessing && (
+            <Box mt={2}>
+              <LinearProgress 
+                sx={{
+                  backgroundColor: 'rgba(255,255,255,0.1)',
+                  '& .MuiLinearProgress-bar': {
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  },
+                }}
+              />
+              <Typography variant="body2" color="text.secondary" mt={1} sx={{ fontSize: { xs: '0.8rem', md: '0.9rem' } }}>
+                Processing your text...
+              </Typography>
+            </Box>
+          )}
+        </Paper>
+
+        {/* AI Detection Section */}
+        <Paper 
+          elevation={0} 
+          sx={{ 
+            p: { xs: 2, md: 4 },
+            background: 'rgba(26, 26, 46, 0.8)',
+            backdropFilter: 'blur(10px)',
+            border: '1px solid rgba(99, 102, 241, 0.2)',
+            borderRadius: 4,
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+          }}
+        >
+          {/* Section Title */}
+          <Box textAlign="center" mb={4}>
+            <Typography
+              variant="h4"
+              component="h2"
+              sx={{
+                fontWeight: 700,
+                fontSize: { xs: '1.5rem', md: '2.2rem' },
+                background: 'linear-gradient(45deg, #ffffff 30%, #fbbf24 90%)',
+                backgroundClip: 'text',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                textShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                mb: 2,
+              }}
+            >
+              Free AI Detection
+            </Typography>
+            <Typography
+              variant="h6"
+              color="text.secondary"
+              sx={{
+                fontWeight: 400,
+                opacity: 0.8,
+                maxWidth: 600,
+                mx: 'auto',
+                fontSize: { xs: '0.9rem', md: '1.1rem' },
+              }}
+            >
+              100% free and unlimited use to detect AI-generated content. Get instant results from multiple detection engines to verify if your text is human-written or AI-generated.
+            </Typography>
+          </Box>
+
+          <Box display="flex" flexDirection={{ xs: 'column', md: 'row' }} gap={4} alignItems="stretch">
+            {/* AI Check Input */}
+            <Box flex={2} display="flex" flexDirection="column">
+              <Box display="flex" alignItems="center" justifyContent="space-between" mb={2} flexDirection={{ xs: 'column', sm: 'row' }} gap={1}>
+                <Typography variant="h6" sx={{ color: 'white', fontWeight: 600, fontSize: { xs: '1rem', md: '1.2rem' } }}>
+                  Text to Check
+                </Typography>
+                <Chip
+                  label={`${aiCheckWordCount} words`}
+                  size="small"
+                  sx={{
+                    backgroundColor: 'rgba(99, 102, 241, 0.2)',
+                    color: '#6366f1',
+                    fontWeight: 600,
+                    fontSize: { xs: '0.7rem', md: '0.75rem' },
+                  }}
+                />
+              </Box>
+              <TextField
+                multiline
+                rows={isMobile ? 6 : 10}
+                fullWidth
+                placeholder="Add 30 + words to run the AI check."
+                value={aiCheckText}
+                onChange={(e) => setAiCheckText(e.target.value)}
+                variant="outlined"
+                sx={{
+                  flex: 1,
+                  '& .MuiOutlinedInput-root': {
+                    backgroundColor: 'rgba(255,255,255,0.03)',
+                    borderRadius: 2,
+                    height: '100%',
+                    '& fieldset': {
+                      borderColor: 'rgba(255,255,255,0.1)',
+                    },
+                    '&:hover fieldset': {
+                      borderColor: 'rgba(255,255,255,0.2)',
+                    },
+                    '&.Mui-focused fieldset': {
+                      borderColor: '#6366f1',
+                      borderWidth: 2,
+                    },
+                  },
+                  '& .MuiInputBase-input': {
+                    color: 'white',
+                    fontSize: { xs: '0.9rem', md: '0.95rem' },
+                    height: '100% !important',
+                  },
+                  '& .MuiInputBase-input::placeholder': {
+                    color: 'rgba(255,255,255,0.4)',
+                    opacity: 1,
+                  },
+                }}
+              />
+            </Box>
+
+            {/* AI Check Results */}
+            <Box flex={1} display="flex" flexDirection="column">
+              <Paper
+                elevation={0}
+                sx={{
+                  p: { xs: 2, md: 3 },
+                  backgroundColor: 'rgba(55, 65, 81, 0.3)',
+                  borderRadius: 3,
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  flex: 1,
+                  display: 'flex',
+                  flexDirection: 'column',
+                }}
+              >
+                <Box textAlign="center" sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                  {aiCheckScore === null ? (
+                    <>
+                      <Typography variant="body1" color="rgba(255,255,255,0.7)" mb={3} fontWeight={500} sx={{ fontSize: { xs: '0.8rem', md: '0.9rem' } }}>
+                        Waiting for text...
+                      </Typography>
+                      <Box
+                        sx={{
+                          width: { xs: 80, md: 120 },
+                          height: { xs: 40, md: 60 },
+                          borderRadius: '60px 60px 0 0',
+                          background: 'rgba(55, 65, 81, 0.8)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          position: 'relative',
+                          mb: 3,
+                          mx: 'auto',
+                          border: '2px solid rgba(255,255,255,0.1)',
+                        }}
+                      >
+                        <Typography variant="body2" color="rgba(255,255,255,0.7)" fontWeight={600} sx={{ fontSize: { xs: '0.7rem', md: '0.8rem' } }}>
+                          AI GPT
+                        </Typography>
+                      </Box>
+                    </>
+                  ) : (
+                    <>
+                      <Box
+                        sx={{
+                          width: { xs: 80, md: 120 },
+                          height: { xs: 40, md: 60 },
+                          borderRadius: '60px 60px 0 0',
+                          background: `conic-gradient(${getAiCheckColor(aiCheckScore)} 0deg, ${getAiCheckColor(aiCheckScore)} ${(aiCheckScore / 100) * 360}deg, rgba(55, 65, 81, 0.8) ${(aiCheckScore / 100) * 360}deg)`,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          position: 'relative',
+                          mb: 2,
+                          mx: 'auto',
+                          border: '2px solid rgba(255,255,255,0.1)',
+                        }}
+                      >
+                        <Typography variant="h6" fontWeight="bold" color="white" sx={{ fontSize: { xs: '1rem', md: '1.2rem' } }}>
+                          {aiCheckScore}%
+                        </Typography>
+                      </Box>
+                      <Typography variant="h6" color={getAiCheckColor(aiCheckScore)} mb={3} fontWeight={600} sx={{ fontSize: { xs: '1rem', md: '1.2rem' } }}>
+                        {getAiCheckLabel(aiCheckScore)}
+                      </Typography>
+                    </>
+                  )}
+
+                  <Typography variant="body2" color="rgba(255,255,255,0.7)" mb={2} fontWeight={500} sx={{ fontSize: { xs: '0.7rem', md: '0.8rem' } }}>
+                    Also checked with:
+                  </Typography>
+
+                  {/* AI Detection Services */}
+                  <Box display="flex" flexDirection="column" gap={1.5}>
+                    {[
+                      { name: 'Turnitin', icon: '♪' },
+                      { name: 'Copyleaks', icon: '©' },
+                      { name: 'OriginalityAI', icon: '🧠' },
+                      { name: 'GPTZero', icon: '○' },
+                      { name: 'Crossplag', icon: 'S' },
+                      { name: 'Sapling.ai', icon: 'V' },
+                      { name: 'Gowinston.ai', icon: 'W' },
+                      { name: 'ZeroGPT', icon: '🔍' },
+                    ].map((service, index) => (
+                      <Box key={index} display="flex" alignItems="center" gap={1.5} justifyContent="center">
+                        <Typography variant="body2" color="rgba(255,255,255,0.7)" sx={{ minWidth: 20, fontSize: { xs: '0.8rem', md: '1rem' } }}>
+                          {service.icon}
+                        </Typography>
+                        <Typography variant="body2" color="rgba(255,255,255,0.7)" sx={{ flex: 1, textAlign: 'left', fontSize: { xs: '0.7rem', md: '0.85rem' } }}>
+                          {service.name}
+                        </Typography>
+                        {aiCheckScore !== null && (
+                          <Typography variant="body2" color={getAiCheckColor(aiCheckScore)} fontWeight={600} sx={{ fontSize: { xs: '0.7rem', md: '0.85rem' } }}>
+                            {aiCheckScore > 50 ? '✗' : '✓'}
+                          </Typography>
+                        )}
+                      </Box>
+                    ))}
+                  </Box>
+                </Box>
+              </Paper>
+            </Box>
+          </Box>
+
+          {/* Check for AI Button */}
+          <Box display="flex" justifyContent="center" mt={4}>
+            <Button
+              variant="contained"
+              size="large"
+              onClick={handleAiCheck}
+              disabled={!aiCheckText.trim() || aiCheckText.split(' ').length < 30 || isAiChecking}
+              sx={{
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                px: 4,
+                py: 1.5,
+                borderRadius: 2,
+                textTransform: 'uppercase',
+                fontWeight: 700,
+                fontSize: { xs: '0.8rem', md: '0.9rem' },
+                letterSpacing: '0.5px',
+                boxShadow: '0 4px 20px rgba(102, 126, 234, 0.4)',
+                '&:hover': {
+                  background: 'linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%)',
+                  boxShadow: '0 6px 25px rgba(102, 126, 234, 0.6)',
+                  transform: 'translateY(-1px)',
+                },
+                '&:disabled': {
+                  background: 'rgba(255,255,255,0.1)',
+                  color: 'rgba(255,255,255,0.3)',
+                },
+              }}
+            >
+              {isAiChecking ? 'Checking...' : 'Check for AI'}
+            </Button>
+          </Box>
+        </Paper>
+
+        {/* Copy Success Snackbar */}
+        <Snackbar
+          open={copySuccess}
+          autoHideDuration={2000}
+          onClose={() => setCopySuccess(false)}
+          message="Text copied to clipboard!"
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        />
+      </Container>
+    </Box>
+  );
+};
+
+export default Home;
