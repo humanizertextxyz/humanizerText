@@ -226,11 +226,6 @@ async function generateAdvancedHumanizedText(
   // This ensures the model never sees them in the input, making it impossible to output them
   const cleanedText = text.replace(/—/g, ' ');
   
-  // Debug logging to see if em dashes are being removed
-  console.log('Original text contains em dashes:', text.includes('—'));
-  console.log('Cleaned text contains em dashes:', cleanedText.includes('—'));
-  console.log('Em dash count in original:', (text.match(/—/g) || []).length);
-  console.log('Em dash count in cleaned:', (cleanedText.match(/—/g) || []).length);
   
   // Get length instructions based on textLength
   const lengthInstruction = getLengthInstructions(textLength || 'maintain');
@@ -353,9 +348,6 @@ Output with everything to make sure it's done to my information and instructions
     // Post-process the result to remove any em dashes that the AI might have added
     const finalResult = result.replace(/—/g, ' ');
     
-    // Debug logging for the final result
-    console.log('AI output contains em dashes:', result.includes('—'));
-    console.log('Final result contains em dashes:', finalResult.includes('—'));
     
     return finalResult;
   } catch (error) {
