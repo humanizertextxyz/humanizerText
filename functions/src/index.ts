@@ -172,15 +172,7 @@ export const humanizeText = onRequest({secrets: [openaiApiKey], ...corsOptions},
       return;
     }
 
-    // Debug logging to see what values we're receiving
-    console.log('Received parameters:', {
-      temperature,
-      top_p,
-      frequency_penalty,
-      presence_penalty
-    });
-    
-    // Generate humanized text using the new advanced method
+    // Generate humanized text using the exact same approach as emdash.py
     const humanizedText = await generateAdvancedHumanizedText(
       text, 
       writingStyle, 
@@ -213,7 +205,7 @@ export const humanizeText = onRequest({secrets: [openaiApiKey], ...corsOptions},
   }
 });
 
-// Advanced Humanization Function with Undetectable Prompt
+// Advanced Humanization Function with Undetectable Prompt - EXACTLY like emdash.py
 async function generateAdvancedHumanizedText(
   text: string, 
   writingStyle?: string, 
@@ -230,26 +222,21 @@ async function generateAdvancedHumanizedText(
   presence_penalty?: number
 ): Promise<string> {
   
-  // Pre-process the input text to remove all em dashes
-  // This ensures the model never sees them in the input, making it impossible to output them
-  const cleanedText = text.replace(/—/g, ' ');
-  
-  
   // Get length instructions based on textLength
   const lengthInstruction = getLengthInstructions(textLength || 'maintain');
   
-  // Build the advanced prompt
-  const prompt = `
-Rewrite the TEXT with the same meaning but a different surface form. Follow this style rubric:
+  // Build the prompt exactly like emdash.py
+  const prompt = `Rewrite the TEXT with the same meaning but a different surface form. Follow this style rubric:
+
 A. Perplexity (High)
 * Use unexpected yet fitting verbs and nouns; avoid stock phrases.
 * Replace at least 30% of content words with strong synonyms or rephrasings.
 * Avoid formulaic connectors ("in conclusion," "overall," etc.).
 B. Burstiness (High)
 * Sentence mix:
-    * 40–60% short (≤10 words),
-    * 25–40% medium (11–20 words),
-    * 10–20% long (28–45 words).
+* 40–60% short (≤10 words),
+* 25–40% medium (11–20 words),
+* 10–20% long (28–45 words).
 * Include 1 fragment and 1 parenthetical or brief self-correction.
 C. Consistency (Slightly Lower)
 * Allow up to 2 mild shifts in tone/tempo (e.g., a quick aside or rhetorical question).
@@ -264,8 +251,8 @@ Output Rules (IMPORTANT)
 * Return only the rewritten text, no commentary.
 * ${lengthInstruction}
 * DO NOT INCLUDE EM DASHES "—" ANYWHERE IN YOUR OUTPUT AT ALL!
-* REMOVE ALL EM DASHES "—" FROM THE INPUT TEXT AND REPLACE WITH APPROPRIATE PUNCTUATION (commas, periods, or semicolons)
-TEXT: ${cleanedText}
+
+TEXT: ${text}
 
 Optional Add-Ons (If nothing is listed, skip over it)
 * Keywords to preserve verbatim: ${keywordsToPreserve || ''}
@@ -275,52 +262,13 @@ Optional Add-Ons (If nothing is listed, skip over it)
 * Persona lens: ${personaLens || ''}
 * Writing Style: ${writingStyle || ''}
 * Custom Request: ${customRequest || ''}
+
 Common pitfalls to avoid
 * MAKE SURE TO FOLLOW THE OUTPUT RULES STRICTLY! DO NOT BREAK THEM! THIS IS VERY VITAL!
 * Overdoing "quirkiness" so meaning drifts.
 * Repeating the same opening rhythm ("X is…," "Y is…").
 * Adding new facts to sound "human".
 * Making every sentence long—burstiness needs contrast, not uniform length.
-
-COMPREHENSIVE WRITING GUIDELINES:
-DO:
-Have tiny unnoticeable imperfections
-
-DON'T:   
-AI text similarities:
-Formulaic Structure
-The text follows a rigid, structured format with clear transitions, headings, and connectors, making it feel predictable and formulaic.
-Robotic or Impersonal Tone
-The writing style is formal and polished, often impersonal and detached, focusing on clarity but lacking warmth or personality.
-Artificial Simplicity
-The sentence structure is overly simple and conversational, sometimes starting with conjunctions, but lacking nuance.
-Overly Simple or Unimaginative Writing
-The text is linear, straightforward, and grammatically correct but lacks creativity, depth, and variation in style.
-Speculative or Uncertain Language
-The text leans on speculative or hypothetical elements, often showing uncertainty and avoiding firm conclusions.
-Technical Jargon
-Complex sentences with multiple clauses rely heavily on advanced vocabulary and jargon, which can obscure readability.
-Dry or Functional Vocabulary
-Word choice is functional and event-focused, prioritizing clarity but limiting imagery or personal expression.
-Precision Over Naturalness
-Word choice prioritizes clarity and sophistication, sometimes at the cost of natural flow.
-Predictable Syntax & Rhythm
-The text favors repetitive structures and declarative sentences, leading to a steady and predictable rhythm.
-Mechanical Style
-The writing lacks literary devices or imaginative turns, focusing instead on precision and structure.
-Rich Yet Shallow
-The vocabulary is varied and sophisticated but lacks emotional depth and spontaneity.
-
-DON'T USE THESE WORDS/PHRASES:
-"pushing boundaries"
-"swirling"
-"challenges our understanding"
-"Insights"
-"Plays a crucial role"
-"highlights the importance"
-"Crucial"
-
-Output with everything to make sure it's done to my information and instructions. If not, redo the output until it is.
 `;
 
   try {
@@ -330,17 +278,11 @@ Output with everything to make sure it's done to my information and instructions
     });
     
     const completion = await openai.chat.completions.create({
-      model: "gpt-4.1",
+      model: "gpt-4",
       messages: [
         {
           role: "system",
-          content: (
-            "You are a precise line editor. Rewrite the user's text with the same meaning. Increase lexical surprise " +
-            "and vary sentence lengths; include one short fragment. Avoid repeating " +
-            "distinctive phrases or sentence starters. Keep facts, entities, and logic. " +
-            "Slightly relaxed tone is OK, but stay readable. NEVER use em dashes (—) in your output. " +
-            "Replace any em dashes in the input with appropriate punctuation. Output only the rewrite."
-          )
+          content: "You are a precise line editor. Rewrite the user's text with the same meaning. Increase lexical surprise and vary sentence lengths; include one short fragment. Avoid repeating distinctive phrases or sentence starters. Keep facts, entities, and logic. Slightly relaxed tone is OK, but stay readable. CRITICAL: NEVER use any type of dash (—, –, ―, ‐, ‑, ‒, ⁓, 〜, ～) in your output. Use commas, periods, semicolons, or colons instead of dashes. If you see dashes in the input, replace them with commas. This is extremely important - no dashes allowed. Output only the rewrite."
         },
         { role: "user", content: prompt }
       ],
@@ -353,18 +295,20 @@ Output with everything to make sure it's done to my information and instructions
 
     const result = completion.choices[0]?.message?.content?.trim() || text;
     
-    // Post-process the result to remove any em dashes that the AI might have added
-    const finalResult = result.replace(/—/g, ' ');
+    // Check for dashes (like your Python script)
+    if (result.includes("—") || result.includes("–") || result.includes("―")) {
+      console.log("DASH FOUND");
+    }
     
-    
-    return finalResult;
+    // Replace em dashes with commas (exactly like your Python script)
+    let resultCleaned = result.replace(/—/g, ", ");
+
+    return resultCleaned;
   } catch (error) {
     console.error('OpenAI API Error:', error);
-    throw new Error('Failed to generate humanized text');
+    throw new Error('Temporary error, please try again later');
   }
 }
-
-
 
 // Helper function to get length instructions
 function getLengthInstructions(length: string): string {
@@ -378,4 +322,3 @@ function getLengthInstructions(length: string): string {
       return 'Length: within ±10% of the original.';
   }
 }
-
