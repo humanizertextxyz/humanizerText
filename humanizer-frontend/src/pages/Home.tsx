@@ -434,13 +434,28 @@ const Home: React.FC = () => {
       
       const data = result.data as HumanizationResult;
       
-      setOutputText(data.humanized_text);
+      // FRONTEND DASH REMOVAL - Clean the text after receiving from Firebase
+      let cleanedText = data.humanized_text;
+      
+      // Remove all types of dashes
+      cleanedText = cleanedText.replace(/—/g, ", ");  // Em dash
+      cleanedText = cleanedText.replace(/–/g, ", ");  // En dash
+      cleanedText = cleanedText.replace(/―/g, ", ");  // Horizontal bar
+      cleanedText = cleanedText.replace(/‐/g, ", ");  // Hyphen
+      cleanedText = cleanedText.replace(/‑/g, ", ");  // Non-breaking hyphen
+      cleanedText = cleanedText.replace(/‒/g, ", ");  // Figure dash
+      
+      console.log("FRONTEND DASH REMOVAL - Original:", data.humanized_text);
+      console.log("FRONTEND DASH REMOVAL - Cleaned:", cleanedText);
+      console.log("FRONTEND DASH REMOVAL - Still has em dash:", cleanedText.includes('—'));
+      
+      setOutputText(cleanedText);
       setHumanizationResult(data);
       setShowSuccess(true);
       
-      // Save to history if user is authenticated
+      // Save to history if user is authenticated (use cleaned text)
       if (currentUser) {
-        await saveToHistory(inputText, data.humanized_text);
+        await saveToHistory(inputText, cleanedText);
       }
       
       // Update word usage only for authenticated users

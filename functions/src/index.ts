@@ -39,10 +39,164 @@ export const helloWorld = onCall(async (request) => {
   };
 });
 
+// Test function to verify dash removal
+export const testDashRemoval = onRequest(corsOptions, async (req, res) => {
+  // Set CORS headers
+  res.set('Access-Control-Allow-Origin', 'https://humanizertext.xyz, https://humanizertext-551ee.web.app, http://localhost:3000');
+  res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type');
+  
+  // Handle preflight request
+  if (req.method === 'OPTIONS') {
+    res.status(204).send('');
+    return;
+  }
+
+  const testString = "This is a test—with em dashes—to see if they get removed properly.";
+  const cleaned = testString.replace(/—/g, ", ");
+  
+  res.json({
+    original: testString,
+    cleaned: cleaned,
+    success: true
+  });
+});
+
+// SIMPLE TEST FUNCTION
+export const testFunction = onRequest(corsOptions, async (req, res) => {
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type');
+  
+  if (req.method === 'OPTIONS') {
+    res.status(204).send('');
+    return;
+  }
+
+  const { text } = req.body.data || req.body;
+  
+  console.log("TEST FUNCTION - Received text:", text);
+  
+  // Simple dash removal
+  let cleaned = text || "No text provided";
+  cleaned = cleaned.replace(/—/g, ", ");
+  cleaned = cleaned.replace(/–/g, ", ");
+  cleaned = cleaned.replace(/―/g, ", ");
+  
+  console.log("TEST FUNCTION - Cleaned text:", cleaned);
+  
+  res.json({
+    success: true,
+    original: text,
+    cleaned: cleaned,
+    method: 'test_function'
+  });
+});
+
+// NEW HUMANIZE FUNCTION - Fresh start with dash removal
+export const humanizeTextNew = onRequest(corsOptions, async (req, res) => {
+  // Set CORS headers
+  res.set('Access-Control-Allow-Origin', 'https://humanizertext.xyz, https://humanizertext-551ee.web.app, http://localhost:3000');
+  res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type');
+  
+  // Handle preflight request
+  if (req.method === 'OPTIONS') {
+    res.status(204).send('');
+    return;
+  }
+
+  try {
+    const {
+      text,
+      writingStyle = 'natural',
+      textLength = 'same',
+      keywordsToPreserve = '',
+      readingLevel = '',
+      toneGuardrails = '',
+      prohibitedItems = '',
+      personaLens = '',
+      customRequest = '',
+      temperature = 0.9,
+      top_p = 0.9,
+      frequency_penalty = 0.1,
+      presence_penalty = 0.1
+    } = req.body.data || req.body;
+    
+    if (!text || typeof text !== 'string') {
+      res.status(400).json({ error: 'Text is required and must be a string' });
+      return;
+    }
+
+    if (text.trim().split(' ').length < 30) {
+      res.status(400).json({ error: 'Text must be at least 30 words' });
+      return;
+    }
+
+    console.log("NEW FUNCTION - Starting with text:", text.substring(0, 100) + "...");
+    console.log("NEW FUNCTION - Text length:", text.length);
+
+    // Generate humanized text using OpenAI
+    const humanizedText = await generateAdvancedHumanizedText(
+      text, 
+      writingStyle, 
+      textLength, 
+      keywordsToPreserve, 
+      readingLevel, 
+      toneGuardrails, 
+      prohibitedItems, 
+      personaLens, 
+      customRequest,
+      temperature,
+      top_p,
+      frequency_penalty,
+      presence_penalty
+    );
+    
+    console.log("NEW FUNCTION - Generated text:", humanizedText.substring(0, 100) + "...");
+    console.log("NEW FUNCTION - Has em dash:", humanizedText.includes('—'));
+    
+    // FORCE DASH REMOVAL - This MUST work
+    let finalCleanedText = humanizedText;
+    finalCleanedText = finalCleanedText.replace(/—/g, ", ");
+    finalCleanedText = finalCleanedText.replace(/–/g, ", ");
+    finalCleanedText = finalCleanedText.replace(/―/g, ", ");
+    
+    console.log("NEW FUNCTION - After dash removal:", finalCleanedText.substring(0, 100) + "...");
+    console.log("NEW FUNCTION - Still has em dash:", finalCleanedText.includes('—'));
+    
+    // Force the response to use the cleaned text
+    const responseData = {
+      success: true,
+      original_text: text,
+      humanized_text: finalCleanedText,
+      method: 'new_humanize_function'
+    };
+    
+    // FINAL FORCE: Remove any remaining dashes
+    responseData.humanized_text = responseData.humanized_text.replace(/—/g, ", ");
+    responseData.humanized_text = responseData.humanized_text.replace(/–/g, ", ");
+    responseData.humanized_text = responseData.humanized_text.replace(/―/g, ", ");
+    
+    console.log("NEW FUNCTION - Final result:", responseData.humanized_text.substring(0, 100) + "...");
+    console.log("NEW FUNCTION - Final has em dash:", responseData.humanized_text.includes('—'));
+    
+    res.status(200).json({ result: responseData });
+    
+  } catch (error) {
+    console.error('NEW FUNCTION Error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    res.status(500).json({ 
+      error: 'Humanization failed', 
+      details: errorMessage 
+    });
+  }
+});
+
 // ZeroGPT AI Detection Function - HTTP Function (NO AUTHENTICATION REQUIRED)
 export const detectAiText = onRequest(corsOptions, async (req, res) => {
   // Set CORS headers
-  res.set('Access-Control-Allow-Origin', 'https://humanizertext.xyz, https://humanizertext-551ee.web.app');
+  res.set('Access-Control-Allow-Origin', 'https://humanizertext.xyz, https://humanizertext-551ee.web.app, http://localhost:3000');
   res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.set('Access-Control-Allow-Headers', 'Content-Type');
   
@@ -83,11 +237,11 @@ export const detectAiText = onRequest(corsOptions, async (req, res) => {
       'Referer': 'https://www.zerogpt.com/',
       'Sec-Ch-Ua': '"Chromium";v="139", "Not;A=Brand";v="99"',
       'Sec-Ch-Ua-Mobile': '?0',
-      'Sec-Ch-Ua-Platform': '"macOS"',
+      'Sec-Ch-Ua-Platform': '"Windows"',
       'Sec-Fetch-Dest': 'empty',
       'Sec-Fetch-Mode': 'cors',
       'Sec-Fetch-Site': 'same-site',
-      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36'
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36'
     };
     
     const payload = { input_text: text };
@@ -130,7 +284,7 @@ export const detectAiText = onRequest(corsOptions, async (req, res) => {
 // Advanced Humanization Function - HTTP Function (NO AUTHENTICATION REQUIRED)
 export const humanizeText = onRequest({secrets: [openaiApiKey], ...corsOptions}, async (req, res) => {
   // Set CORS headers
-  res.set('Access-Control-Allow-Origin', 'https://humanizertext.xyz, https://humanizertext-551ee.web.app');
+  res.set('Access-Control-Allow-Origin', 'https://humanizertext.xyz, https://humanizertext-551ee.web.app, http://localhost:3000');
   res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.set('Access-Control-Allow-Headers', 'Content-Type');
   
@@ -189,12 +343,22 @@ export const humanizeText = onRequest({secrets: [openaiApiKey], ...corsOptions},
       presence_penalty
     );
     
+    // Original function - no dash removal (we'll handle this in frontend)
+    const finalCleanedText = humanizedText;
+    
+    // Force the response to use the cleaned text
     const responseData = {
       success: true,
       original_text: text,
-      humanized_text: humanizedText,
+      humanized_text: finalCleanedText,
       method: 'advanced_undetectable_prompt'
     };
+    
+    console.log("=== FINAL RESPONSE ===");
+    console.log("Response humanized_text:", responseData.humanized_text);
+    console.log("Contains em dash:", responseData.humanized_text.includes('—'));
+    
+    // No additional processing - frontend will handle dash removal
     
     res.status(200).json({ result: responseData });
     
@@ -269,6 +433,7 @@ Common pitfalls to avoid
 * Repeating the same opening rhythm ("X is…," "Y is…").
 * Adding new facts to sound "human".
 * Making every sentence long—burstiness needs contrast, not uniform length.
+* USING EM DASHES "—" ANYWHERE IN YOUR OUTPUT AT ALL! THIS IS VERY VITAL! DO NOT USE EM DASHES! 
 `;
 
   try {
@@ -300,8 +465,42 @@ Common pitfalls to avoid
       console.log("DASH FOUND");
     }
     
-    // Replace em dashes with commas (exactly like your Python script)
-    let resultCleaned = result.replace(/—/g, ", ");
+    console.log("=== ORIGINAL AI OUTPUT ===");
+    console.log(result);
+    console.log("===================");
+    console.log("FORCING REDEPLOY - DASH REMOVAL ACTIVE");
+    
+    // Test dash removal on a simple string
+    const testString = "This is a test—with em dashes—to see if they get removed.";
+    const testCleaned = testString.replace(/—/g, ", ");
+    console.log("TEST DASH REMOVAL:");
+    console.log("Original:", testString);
+    console.log("Cleaned:", testCleaned);
+    
+    // Replace ALL types of dashes with commas (comprehensive approach)
+    let resultCleaned = result;
+    
+    // Replace all dash types with commas
+    resultCleaned = resultCleaned.replace(/—/g, ", ");  // Em dash
+    resultCleaned = resultCleaned.replace(/–/g, ", ");  // En dash
+    resultCleaned = resultCleaned.replace(/―/g, ", ");  // Horizontal bar
+    resultCleaned = resultCleaned.replace(/‐/g, ", ");  // Hyphen
+    resultCleaned = resultCleaned.replace(/‑/g, ", ");  // Non-breaking hyphen
+    resultCleaned = resultCleaned.replace(/‒/g, ", ");  // Figure dash
+    resultCleaned = resultCleaned.replace(/⁓/g, ", ");  // Swung dash
+    resultCleaned = resultCleaned.replace(/〜/g, ", ");  // Wave dash
+    resultCleaned = resultCleaned.replace(/～/g, ", ");  // Fullwidth tilde
+    
+    // Additional comprehensive dash removal using Unicode ranges
+    resultCleaned = resultCleaned.replace(/[\u2010-\u2015\u2043-\u205F\u2212\u301C-\u301F\u3030\u30FC\uFF0D\uFF5E]/g, ", ");
+    
+    // Final cleanup - replace any remaining dash-like characters
+    resultCleaned = resultCleaned.replace(/[—–―‐‑‒⁓〜～\u2010-\u2015\u2043-\u205F\u2212\u301C-\u301F\u3030\u30FC\uFF0D\uFF5E]/g, ", ");
+
+    
+    console.log("=== CLEANED RESULT ===");
+    console.log(resultCleaned);
+    console.log("===================");
 
     return resultCleaned;
   } catch (error) {
