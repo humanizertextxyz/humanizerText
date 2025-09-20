@@ -1,5 +1,8 @@
 import { onRequest } from 'firebase-functions/v2/https';
-import { corsOptions } from './index';
+
+const corsOptions = {
+  cors: true
+};
 
 // NEW HUMANIZE FUNCTION - Fresh start with dash removal
 export const humanizeTextNew = onRequest(corsOptions, async (req, res) => {

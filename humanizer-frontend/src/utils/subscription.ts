@@ -12,13 +12,13 @@ export const SUBSCRIPTION_TIERS: Record<string, SubscriptionTier> = {
   free: {
     name: 'Free',
     type: 'free',
-    dailyWords: 1500,
+    dailyWords: 1000,
     monthlyWords: 0, // Not applicable for free tier
-    wordsPerProcess: 250,
+    wordsPerProcess: 150,
     price: 0,
     features: [
-      '1,500 words per day',
-      '250 words per process',
+      '1,000 words per day',
+      '150 words per process',
       'Basic humanization',
       'AI detection',
     ],
@@ -27,12 +27,11 @@ export const SUBSCRIPTION_TIERS: Record<string, SubscriptionTier> = {
     name: 'Pro',
     type: 'pro',
     dailyWords: 0, // Not applicable for paid tiers
-    monthlyWords: 20000,
-    wordsPerProcess: 750,
-    price: 19.99,
+    monthlyWords: 0, // No monthly limit for Pro
+    wordsPerProcess: 500,
+    price: 9.99,
     features: [
-      '20,000 words per month',
-      '750 words per process',
+      '500 words per process',
       'All modes and settings',
       'Advanced options',
       'Priority support',
@@ -42,11 +41,10 @@ export const SUBSCRIPTION_TIERS: Record<string, SubscriptionTier> = {
     name: 'Premium',
     type: 'premium',
     dailyWords: 0, // Not applicable for paid tiers
-    monthlyWords: 50000,
+    monthlyWords: 0, // No monthly limit for Premium
     wordsPerProcess: 0, // Unlimited
-    price: 29.99,
+    price: 19.99,
     features: [
-      '50,000 words per month',
       'Unlimited words per process',
       'All modes and settings',
       'Advanced options',
@@ -57,11 +55,11 @@ export const SUBSCRIPTION_TIERS: Record<string, SubscriptionTier> = {
     name: 'Platinum',
     type: 'platinum',
     dailyWords: 0, // Not applicable for paid tiers
-    monthlyWords: 150000,
+    monthlyWords: 1000000, // 1 million words per month
     wordsPerProcess: 0, // Unlimited
-    price: 49.99,
+    price: 0, // Will be set dynamically
     features: [
-      '150,000 words per month',
+      '1,000,000 words per month',
       'Unlimited words per process',
       'All modes and settings',
       'Advanced options',
@@ -154,8 +152,8 @@ export const canUserProcessText = (
     }
   }
   
-  // Check monthly limit for paid users
-  if (tier.type !== 'free') {
+  // Check monthly limit for paid users (only Platinum has monthly limit)
+  if (tier.type === 'platinum' && tier.monthlyWords > 0) {
     if (monthlyWordsUsed >= tier.monthlyWords) {
       return {
         canProcess: false,

@@ -53,8 +53,8 @@ const Pricing: React.FC = () => {
   const getPrice = (tierType: string) => {
     const prices = {
       free: { monthly: 0, yearly: 0 },
-      pro: { monthly: 19.99, yearly: 199.90 },
-      premium: { monthly: 29.99, yearly: 299.90 },
+      pro: { monthly: 9.99, yearly: 99.90 },
+      premium: { monthly: 19.99, yearly: 199.90 },
       platinum: { monthly: 49.99, yearly: 499.90 },
     };
     return prices[tierType as keyof typeof prices] || { monthly: 0, yearly: 0 };

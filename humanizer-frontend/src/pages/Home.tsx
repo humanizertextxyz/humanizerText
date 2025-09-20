@@ -429,7 +429,9 @@ const Home: React.FC = () => {
         temperature: convertTemperatureToBackend(temperature),
         top_p: convertTopPToBackend(topP),
         frequency_penalty: convertFrequencyPenaltyToBackend(frequencyPenalty),
-        presence_penalty: convertPresencePenaltyToBackend(presencePenalty)
+        presence_penalty: convertPresencePenaltyToBackend(presencePenalty),
+        userEmail: currentUser?.email,
+        userSubscription: userData?.subscription
       });
       
       const data = result.data as HumanizationResult;

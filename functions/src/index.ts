@@ -313,7 +313,9 @@ export const humanizeText = onRequest({secrets: [openaiApiKey], ...corsOptions},
       temperature,
       top_p,
       frequency_penalty,
-      presence_penalty
+      presence_penalty,
+      userEmail,
+      userSubscription
     } = req.body.data || req.body;
     
     if (!text || typeof text !== 'string') {
@@ -324,6 +326,36 @@ export const humanizeText = onRequest({secrets: [openaiApiKey], ...corsOptions},
     if (text.trim().split(' ').length < 30) {
       res.status(400).json({ error: 'Text must be at least 30 words' });
       return;
+    }
+
+    // Check subscription limits
+    const wordCount = text.trim().split(' ').length;
+    const subscriptionType = userSubscription?.type || 'free';
+    
+    // Define limits based on new subscription tiers
+    const limits = {
+      free: { wordsPerProcess: 150, dailyWords: 1000 },
+      pro: { wordsPerProcess: 500, dailyWords: 0 },
+      premium: { wordsPerProcess: 0, dailyWords: 0 }, // Unlimited
+      platinum: { wordsPerProcess: 0, dailyWords: 0, monthlyWords: 1000000 }
+    };
+    
+    const userLimits = limits[subscriptionType as keyof typeof limits] || limits.free;
+    
+    // Check words per process limit
+    if (userLimits.wordsPerProcess > 0 && wordCount > userLimits.wordsPerProcess) {
+      res.status(400).json({ 
+        error: `Text exceeds limit for ${subscriptionType} plan. Maximum ${userLimits.wordsPerProcess} words per process.`,
+        limit: userLimits.wordsPerProcess,
+        current: wordCount,
+        subscriptionType
+      });
+      return;
+    }
+
+    // Track usage if user is authenticated
+    if (userEmail && userSubscription) {
+      await trackUsage(userEmail, wordCount, subscriptionType);
     }
 
     // Generate humanized text using the exact same approach as emdash.py
@@ -519,5 +551,59 @@ function getLengthInstructions(length: string): string {
     case 'maintain':
     default:
       return 'Length: within ±10% of the original.';
+  }
+}
+
+// Helper function to track user usage
+async function trackUsage(userEmail: string, wordCount: number, subscriptionType: string) {
+  try {
+    const db = getFirestore();
+    const sanitizedEmail = userEmail.replace(/[\.#$\[\]@]/g, (match) => {
+      if (match === '@') return '_at_';
+      return '_';
+    });
+    
+    const userRef = db.collection('users').doc(sanitizedEmail);
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    
+    // Get current usage data
+    const userDoc = await userRef.get();
+    const userData = userDoc.data();
+    
+    const currentDailyUsage = userData?.usage?.daily || 0;
+    const currentMonthlyUsage = userData?.usage?.monthly || 0;
+    const lastUsageDate = userData?.usage?.lastUsageDate;
+    
+    // Reset daily usage if it's a new day
+    const shouldResetDaily = lastUsageDate !== todayStr;
+    const newDailyUsage = shouldResetDaily ? wordCount : currentDailyUsage + wordCount;
+    
+    // Reset monthly usage if it's a new month
+    const currentMonth = today.getMonth();
+    const currentYear = today.getFullYear();
+    const lastUsageMonth = userData?.usage?.lastUsageMonth;
+    const lastUsageYear = userData?.usage?.lastUsageYear;
+    const shouldResetMonthly = lastUsageMonth !== currentMonth || lastUsageYear !== currentYear;
+    const newMonthlyUsage = shouldResetMonthly ? wordCount : currentMonthlyUsage + wordCount;
+    
+    // Update usage tracking
+    await userRef.update({
+      usage: {
+        daily: newDailyUsage,
+        monthly: newMonthlyUsage,
+        lastUsageDate: todayStr,
+        lastUsageMonth: currentMonth,
+        lastUsageYear: currentYear,
+        totalWords: (userData?.usage?.totalWords || 0) + wordCount,
+        lastUpdated: new Date()
+      }
+    });
+    
+    console.log(`Tracked usage for ${userEmail}: ${wordCount} words (Daily: ${newDailyUsage}, Monthly: ${newMonthlyUsage})`);
+    
+  } catch (error) {
+    console.error('Error tracking usage:', error);
+    // Don't throw error to avoid breaking the main function
   }
 }

@@ -41,12 +41,12 @@ export const createStripeProducts = onRequest(
       // Create Pro Plan
       const proProduct = await stripe.products.create({
         name: 'Pro Plan',
-        description: '20,000 words per month, 750 words per process, All modes and settings, Advanced options, Priority support',
+        description: '500 words per process, All modes and settings, Advanced options, Priority support',
       });
 
       const proMonthlyPrice = await stripe.prices.create({
         product: proProduct.id,
-        unit_amount: 1999, // $19.99
+        unit_amount: 999, // $9.99
         currency: 'usd',
         recurring: { interval: 'month' },
         nickname: 'Pro Monthly',
@@ -54,7 +54,7 @@ export const createStripeProducts = onRequest(
 
       const proYearlyPrice = await stripe.prices.create({
         product: proProduct.id,
-        unit_amount: 19990, // $199.90 (2 months free)
+        unit_amount: 9990, // $99.90 (2 months free)
         currency: 'usd',
         recurring: { interval: 'year' },
         nickname: 'Pro Yearly',
@@ -63,12 +63,12 @@ export const createStripeProducts = onRequest(
       // Create Premium Plan
       const premiumProduct = await stripe.products.create({
         name: 'Premium Plan',
-        description: '50,000 words per month, Unlimited words per process, All modes and settings, Advanced options, Priority support',
+        description: 'Unlimited words per process, All modes and settings, Advanced options, Priority support',
       });
 
       const premiumMonthlyPrice = await stripe.prices.create({
         product: premiumProduct.id,
-        unit_amount: 2999, // $29.99
+        unit_amount: 1999, // $19.99
         currency: 'usd',
         recurring: { interval: 'month' },
         nickname: 'Premium Monthly',
@@ -76,7 +76,7 @@ export const createStripeProducts = onRequest(
 
       const premiumYearlyPrice = await stripe.prices.create({
         product: premiumProduct.id,
-        unit_amount: 29990, // $299.90 (2 months free)
+        unit_amount: 19990, // $199.90 (2 months free)
         currency: 'usd',
         recurring: { interval: 'year' },
         nickname: 'Premium Yearly',
@@ -85,12 +85,12 @@ export const createStripeProducts = onRequest(
       // Create Platinum Plan
       const platinumProduct = await stripe.products.create({
         name: 'Platinum Plan',
-        description: '150,000 words per month, Unlimited words per process, All modes and settings, Advanced options, Priority support',
+        description: '1,000,000 words per month, Unlimited words per process, All modes and settings, Advanced options, Priority support',
       });
 
       const platinumMonthlyPrice = await stripe.prices.create({
         product: platinumProduct.id,
-        unit_amount: 4999, // $49.99
+        unit_amount: 4999, // $49.99 (keeping same price for now)
         currency: 'usd',
         recurring: { interval: 'month' },
         nickname: 'Platinum Monthly',
