@@ -42,7 +42,7 @@ export const helloWorld = onCall(async (request) => {
 // Test function to verify dash removal
 export const testDashRemoval = onRequest(corsOptions, async (req, res) => {
   // Set CORS headers
-  res.set('Access-Control-Allow-Origin', 'https://humanizertext.xyz, https://humanizertext-551ee.web.app, http://localhost:3000');
+  res.set('Access-Control-Allow-Origin', 'https://humanizertext.xyz');
   res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.set('Access-Control-Allow-Headers', 'Content-Type');
   
@@ -96,7 +96,7 @@ export const testFunction = onRequest(corsOptions, async (req, res) => {
 // NEW HUMANIZE FUNCTION - Fresh start with dash removal
 export const humanizeTextNew = onRequest(corsOptions, async (req, res) => {
   // Set CORS headers
-  res.set('Access-Control-Allow-Origin', 'https://humanizertext.xyz, https://humanizertext-551ee.web.app, http://localhost:3000');
+  res.set('Access-Control-Allow-Origin', 'https://humanizertext.xyz');
   res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.set('Access-Control-Allow-Headers', 'Content-Type');
   
@@ -196,7 +196,7 @@ export const humanizeTextNew = onRequest(corsOptions, async (req, res) => {
 // ZeroGPT AI Detection Function - HTTP Function (NO AUTHENTICATION REQUIRED)
 export const detectAiText = onRequest(corsOptions, async (req, res) => {
   // Set CORS headers
-  res.set('Access-Control-Allow-Origin', 'https://humanizertext.xyz, https://humanizertext-551ee.web.app, http://localhost:3000');
+  res.set('Access-Control-Allow-Origin', 'https://humanizertext.xyz');
   res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.set('Access-Control-Allow-Headers', 'Content-Type');
   
@@ -284,7 +284,7 @@ export const detectAiText = onRequest(corsOptions, async (req, res) => {
 // Advanced Humanization Function - HTTP Function (NO AUTHENTICATION REQUIRED)
 export const humanizeText = onRequest({secrets: [openaiApiKey], ...corsOptions}, async (req, res) => {
   // Set CORS headers
-  res.set('Access-Control-Allow-Origin', 'https://humanizertext.xyz, https://humanizertext-551ee.web.app, http://localhost:3000');
+  res.set('Access-Control-Allow-Origin', 'https://humanizertext.xyz');
   res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.set('Access-Control-Allow-Headers', 'Content-Type');
   

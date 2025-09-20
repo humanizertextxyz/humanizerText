@@ -26,7 +26,7 @@ export const createStripeProducts = onRequest(
   { secrets: [stripeSecretKey], ...corsOptions },
   async (req, res) => {
     // Set CORS headers
-    res.set('Access-Control-Allow-Origin', 'https://humanizertext.xyz, https://humanizertext-551ee.web.app');
+    res.set('Access-Control-Allow-Origin', 'https://humanizertext.xyz');
     res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.set('Access-Control-Allow-Headers', 'Content-Type');
     
@@ -142,7 +142,7 @@ export const validateCoupon = onRequest(
   { secrets: [stripeSecretKey], ...corsOptions },
   async (req, res) => {
     // Set CORS headers
-    res.set('Access-Control-Allow-Origin', 'https://humanizertext.xyz, https://humanizertext-551ee.web.app');
+    res.set('Access-Control-Allow-Origin', 'https://humanizertext.xyz');
     res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.set('Access-Control-Allow-Headers', 'Content-Type');
     
@@ -232,7 +232,7 @@ export const createCheckoutSession = onRequest(
   { secrets: [stripeSecretKey], ...corsOptions },
   async (req, res) => {
     // Set CORS headers
-    res.set('Access-Control-Allow-Origin', 'https://humanizertext.xyz, https://humanizertext-551ee.web.app');
+    res.set('Access-Control-Allow-Origin', 'https://humanizertext.xyz');
     res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.set('Access-Control-Allow-Headers', 'Content-Type');
     
