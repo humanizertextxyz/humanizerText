@@ -75,7 +75,7 @@ export const testFunction = onRequest(corsOptions, async (req, res) => {
 
   const { text } = req.body.data || req.body;
   
-  console.log("TEST FUNCTION - Received text:", text);
+  // Process text
   
   // Simple dash removal
   let cleaned = text || "No text provided";
@@ -83,7 +83,7 @@ export const testFunction = onRequest(corsOptions, async (req, res) => {
   cleaned = cleaned.replace(/–/g, ", ");
   cleaned = cleaned.replace(/―/g, ", ");
   
-  console.log("TEST FUNCTION - Cleaned text:", cleaned);
+  // Return cleaned text
   
   res.json({
     success: true,
@@ -133,8 +133,7 @@ export const humanizeTextNew = onRequest(corsOptions, async (req, res) => {
       return;
     }
 
-    console.log("NEW FUNCTION - Starting with text:", text.substring(0, 100) + "...");
-    console.log("NEW FUNCTION - Text length:", text.length);
+    // Process text
 
     // Generate humanized text using OpenAI
     const humanizedText = await generateAdvancedHumanizedText(
@@ -153,8 +152,7 @@ export const humanizeTextNew = onRequest(corsOptions, async (req, res) => {
       presence_penalty
     );
     
-    console.log("NEW FUNCTION - Generated text:", humanizedText.substring(0, 100) + "...");
-    console.log("NEW FUNCTION - Has em dash:", humanizedText.includes('—'));
+    // Clean the text
     
     // FORCE DASH REMOVAL - This MUST work
     let finalCleanedText = humanizedText;
@@ -162,8 +160,7 @@ export const humanizeTextNew = onRequest(corsOptions, async (req, res) => {
     finalCleanedText = finalCleanedText.replace(/–/g, ", ");
     finalCleanedText = finalCleanedText.replace(/―/g, ", ");
     
-    console.log("NEW FUNCTION - After dash removal:", finalCleanedText.substring(0, 100) + "...");
-    console.log("NEW FUNCTION - Still has em dash:", finalCleanedText.includes('—'));
+    // Create response
     
     // Force the response to use the cleaned text
     const responseData = {
@@ -178,8 +175,7 @@ export const humanizeTextNew = onRequest(corsOptions, async (req, res) => {
     responseData.humanized_text = responseData.humanized_text.replace(/–/g, ", ");
     responseData.humanized_text = responseData.humanized_text.replace(/―/g, ", ");
     
-    console.log("NEW FUNCTION - Final result:", responseData.humanized_text.substring(0, 100) + "...");
-    console.log("NEW FUNCTION - Final has em dash:", responseData.humanized_text.includes('—'));
+    // Return response
     
     res.status(200).json({ result: responseData });
     
@@ -254,24 +250,30 @@ export const detectAiText = onRequest(corsOptions, async (req, res) => {
     
     if (response.status === 200) {
       const result = response.data;
-      const data = result.data || {};
+      // Process API response
+      
+      // Handle different response structures
+      const data = result.data || result;
       
       const responseData = {
         success: true,
-        is_ai: data.isHuman === 0,
-        is_human: data.isHuman === 1,
-        ai_percentage: data.fakePercentage || 0,
-        feedback: data.feedback || '',
-        language: data.detected_language || '',
-        text_words: data.textWords || 0,
-        ai_words: data.aiWords || 0,
-        highlighted_sentences: data.h || [],
+        is_ai: data.isHuman === 0 || data.is_human === 0 || data.isHuman === false,
+        is_human: data.isHuman === 1 || data.is_human === 1 || data.isHuman === true,
+        ai_percentage: data.fakePercentage || data.ai_percentage || data.percentage || 0,
+        human_percentage: data.humanPercentage || data.human_percentage || (100 - (data.fakePercentage || data.ai_percentage || data.percentage || 0)),
+        feedback: data.feedback || data.message || '',
+        language: data.detected_language || data.language || '',
+        text_words: data.textWords || data.text_words || 0,
+        ai_words: data.aiWords || data.ai_words || 0,
+        highlighted_sentences: data.h || data.highlighted_sentences || [],
         full_response: result
       };
       
+      // Return processed response
       res.status(200).json({ result: responseData });
     } else {
-      res.status(500).json({ error: `ZeroGPT API returned status ${response.status}: ${response.data}` });
+      console.error('ZeroGPT API Error:', response.status, response.data);
+      res.status(500).json({ error: `ZeroGPT API returned status ${response.status}: ${JSON.stringify(response.data)}` });
     }
     
   } catch (error) {
@@ -386,9 +388,7 @@ export const humanizeText = onRequest({secrets: [openaiApiKey], ...corsOptions},
       method: 'advanced_undetectable_prompt'
     };
     
-    console.log("=== FINAL RESPONSE ===");
-    console.log("Response humanized_text:", responseData.humanized_text);
-    console.log("Contains em dash:", responseData.humanized_text.includes('—'));
+    // Return final response
     
     // No additional processing - frontend will handle dash removal
     
@@ -418,55 +418,20 @@ async function generateAdvancedHumanizedText(
   presence_penalty?: number
 ): Promise<string> {
   
-  // Get length instructions based on textLength
-  const lengthInstruction = getLengthInstructions(textLength || 'maintain');
+  // Simplified prompt - no need for complex length instructions
   
-  // Build the prompt exactly like emdash.py
-  const prompt = `Rewrite the TEXT with the same meaning but a different surface form. Follow this style rubric:
+  // Simplified, clear prompt that works better
+  const prompt = `Rewrite the following text to sound more natural and human-like. Keep the same meaning but use different words and sentence structures.
 
-A. Perplexity (High)
-* Use unexpected yet fitting verbs and nouns; avoid stock phrases.
-* Replace at least 30% of content words with strong synonyms or rephrasings.
-* Avoid formulaic connectors ("in conclusion," "overall," etc.).
-B. Burstiness (High)
-* Sentence mix:
-* 40–60% short (≤10 words),
-* 25–40% medium (11–20 words),
-* 10–20% long (28–45 words).
-* Include 1 fragment and 1 parenthetical or brief self-correction.
-C. Consistency (Slightly Lower)
-* Allow up to 2 mild shifts in tone/tempo (e.g., a quick aside or rhetorical question).
-* Keep grammar readable; small, human imperfections are acceptable.
-D. Anti-Repetition
-* Do not repeat distinctive phrases, sentence starters, or rhetorical patterns.
-* Avoid near-duplicates and synonym ping-pong (e.g., cycling "rapid/fast/quick").
-E. Fidelity
-* Keep all facts, relationships, and logical order intact. Do not add claims.
-* Preserve core meaning of the text,named entities, quantities, and cause-effect links.
-Output Rules (IMPORTANT)
-* Return only the rewritten text, no commentary.
-* ${lengthInstruction}
-* DO NOT INCLUDE EM DASHES "—" ANYWHERE IN YOUR OUTPUT AT ALL!
+IMPORTANT RULES:
+- Do NOT use any dashes (—, –, ―) in your output
+- Keep the same meaning and facts
+- Use natural, conversational language
+- Vary sentence lengths
+- Return ONLY the rewritten text, no explanations
 
-TEXT: ${text}
-
-Optional Add-Ons (If nothing is listed, skip over it)
-* Keywords to preserve verbatim: ${keywordsToPreserve || ''}
-* Reading level target: ${readingLevel || ''}
-* Tone guardrails: ${toneGuardrails || ''}
-* Prohibited items: clichés, emojis, corporate buzzwords, em dashes (—)${prohibitedItems ? `, ${prohibitedItems}` : ''}.
-* Persona lens: ${personaLens || ''}
-* Writing Style: ${writingStyle || ''}
-* Custom Request: ${customRequest || ''}
-
-Common pitfalls to avoid
-* MAKE SURE TO FOLLOW THE OUTPUT RULES STRICTLY! DO NOT BREAK THEM! THIS IS VERY VITAL!
-* Overdoing "quirkiness" so meaning drifts.
-* Repeating the same opening rhythm ("X is…," "Y is…").
-* Adding new facts to sound "human".
-* Making every sentence long—burstiness needs contrast, not uniform length.
-* USING EM DASHES "—" ANYWHERE IN YOUR OUTPUT AT ALL! THIS IS VERY VITAL! DO NOT USE EM DASHES! 
-`;
+Text to rewrite:
+${text}`;
 
   try {
     // Initialize OpenAI with the secret
@@ -477,37 +442,20 @@ Common pitfalls to avoid
     const completion = await openai.chat.completions.create({
       model: "gpt-4",
       messages: [
-        {
-          role: "system",
-          content: "You are a precise line editor. Rewrite the user's text with the same meaning. Increase lexical surprise and vary sentence lengths; include one short fragment. Avoid repeating distinctive phrases or sentence starters. Keep facts, entities, and logic. Slightly relaxed tone is OK, but stay readable. CRITICAL: NEVER use any type of dash (—, –, ―, ‐, ‑, ‒, ⁓, 〜, ～) in your output. Use commas, periods, semicolons, or colons instead of dashes. If you see dashes in the input, replace them with commas. This is extremely important - no dashes allowed. Output only the rewrite."
-        },
         { role: "user", content: prompt }
       ],
-      temperature: temperature || 0.95,
-      top_p: Math.min(top_p || 1.0, 1.0), // Ensure top_p never exceeds 1.0
-      frequency_penalty: frequency_penalty || 0.6,
-      presence_penalty: presence_penalty || 0.1,
-      max_tokens: 1000
+      temperature: 0.7,
+      top_p: 0.9,
+      frequency_penalty: 0.0,
+      presence_penalty: 0.0,
+      max_tokens: 2000
     });
 
     const result = completion.choices[0]?.message?.content?.trim() || text;
     
-    // Check for dashes (like your Python script)
-    if (result.includes("—") || result.includes("–") || result.includes("―")) {
-      console.log("DASH FOUND");
-    }
+    // Return the result
     
-    console.log("=== ORIGINAL AI OUTPUT ===");
-    console.log(result);
-    console.log("===================");
-    console.log("FORCING REDEPLOY - DASH REMOVAL ACTIVE");
-    
-    // Test dash removal on a simple string
-    const testString = "This is a test—with em dashes—to see if they get removed.";
-    const testCleaned = testString.replace(/—/g, ", ");
-    console.log("TEST DASH REMOVAL:");
-    console.log("Original:", testString);
-    console.log("Cleaned:", testCleaned);
+    // Clean the result
     
     // Replace ALL types of dashes with commas (comprehensive approach)
     let resultCleaned = result;
@@ -530,9 +478,7 @@ Common pitfalls to avoid
     resultCleaned = resultCleaned.replace(/[—–―‐‑‒⁓〜～\u2010-\u2015\u2043-\u205F\u2212\u301C-\u301F\u3030\u30FC\uFF0D\uFF5E]/g, ", ");
 
     
-    console.log("=== CLEANED RESULT ===");
-    console.log(resultCleaned);
-    console.log("===================");
+    // Return cleaned result
 
     return resultCleaned;
   } catch (error) {
@@ -542,17 +488,7 @@ Common pitfalls to avoid
 }
 
 // Helper function to get length instructions
-function getLengthInstructions(length: string): string {
-  switch (length) {
-    case 'shorter':
-      return 'Length: less than 15% of the original.';
-    case 'longer':
-      return 'Length: More than 15% of the original.';
-    case 'maintain':
-    default:
-      return 'Length: within ±10% of the original.';
-  }
-}
+// Removed unused function
 
 // Helper function to track user usage
 async function trackUsage(userEmail: string, wordCount: number, subscriptionType: string) {
@@ -571,8 +507,8 @@ async function trackUsage(userEmail: string, wordCount: number, subscriptionType
     const userDoc = await userRef.get();
     const userData = userDoc.data();
     
-    const currentDailyUsage = userData?.usage?.daily || 0;
-    const currentMonthlyUsage = userData?.usage?.monthly || 0;
+    const currentDailyUsage = userData?.usage?.dailyWordsUsed || 0;
+    const currentMonthlyUsage = userData?.usage?.monthlyWordsUsed || 0;
     const lastUsageDate = userData?.usage?.lastUsageDate;
     
     // Reset daily usage if it's a new day
@@ -590,8 +526,8 @@ async function trackUsage(userEmail: string, wordCount: number, subscriptionType
     // Update usage tracking
     await userRef.update({
       usage: {
-        daily: newDailyUsage,
-        monthly: newMonthlyUsage,
+        dailyWordsUsed: newDailyUsage,
+        monthlyWordsUsed: newMonthlyUsage,
         lastUsageDate: todayStr,
         lastUsageMonth: currentMonth,
         lastUsageYear: currentYear,
@@ -600,7 +536,7 @@ async function trackUsage(userEmail: string, wordCount: number, subscriptionType
       }
     });
     
-    console.log(`Tracked usage for ${userEmail}: ${wordCount} words (Daily: ${newDailyUsage}, Monthly: ${newMonthlyUsage})`);
+    // Usage tracked successfully
     
   } catch (error) {
     console.error('Error tracking usage:', error);

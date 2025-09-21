@@ -189,11 +189,21 @@ export const getWordsRemaining = (
     };
   }
   
-  const monthlyRemaining = Math.max(0, tier.monthlyWords - monthlyWordsUsed);
+  // For paid tiers, show appropriate limits
+  if (tier.type === 'platinum' && tier.monthlyWords > 0) {
+    const monthlyRemaining = Math.max(0, tier.monthlyWords - monthlyWordsUsed);
+    return {
+      daily: 0,
+      monthly: monthlyRemaining,
+      displayText: `${monthlyRemaining} words left (Monthly)`
+    };
+  }
+  
+  // For Pro and Premium (unlimited monthly), show unlimited
   return {
     daily: 0,
-    monthly: monthlyRemaining,
-    displayText: `${monthlyRemaining} words left (Monthly)`
+    monthly: -1, // -1 indicates unlimited
+    displayText: 'Unlimited words (Monthly)'
   };
 };
 
@@ -213,7 +223,17 @@ export const getUsagePercentage = (
     return Math.min(100, (dailyWordsUsed / tier.dailyWords) * 100);
   }
   
-  return Math.min(100, (monthlyWordsUsed / tier.monthlyWords) * 100);
+  // For Pro and Premium (unlimited monthly), show 0% usage
+  if (tier.type === 'pro' || tier.type === 'premium') {
+    return 0;
+  }
+  
+  // For Platinum, calculate percentage of monthly limit
+  if (tier.type === 'platinum' && tier.monthlyWords > 0) {
+    return Math.min(100, (monthlyWordsUsed / tier.monthlyWords) * 100);
+  }
+  
+  return 0;
 };
 
 export const formatWordsLimit = (limit: number): string => {
