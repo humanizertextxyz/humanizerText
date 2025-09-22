@@ -855,7 +855,7 @@ const Pricing: React.FC = () => {
                   What's the difference between plans?
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Free users get 1,500 words per day with basic features. Pro users get 20,000 words per month with all features. Premium and Platinum users get even more words and unlimited processing.
+                  Free users get 1,000 words per day with basic features. Pro users get 20,000 words per month with all features. Premium users get 50,000 words per month with unlimited processing. Platinum users get unlimited words per month.
                 </Typography>
               </Paper>
             </Box>

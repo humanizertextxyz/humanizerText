@@ -336,10 +336,10 @@ export const humanizeText = onRequest({secrets: [openaiApiKey], ...corsOptions},
     
     // Define limits based on new subscription tiers
     const limits = {
-      free: { wordsPerProcess: 150, dailyWords: 1000 },
-      pro: { wordsPerProcess: 500, dailyWords: 0 },
-      premium: { wordsPerProcess: 0, dailyWords: 0 }, // Unlimited
-      platinum: { wordsPerProcess: 0, dailyWords: 0, monthlyWords: 1000000 }
+      free: { wordsPerProcess: 150, dailyWords: 1000, monthlyWords: 0 },
+      pro: { wordsPerProcess: 500, dailyWords: 0, monthlyWords: 20000 },
+      premium: { wordsPerProcess: 0, dailyWords: 0, monthlyWords: 50000 },
+      platinum: { wordsPerProcess: 0, dailyWords: 0, monthlyWords: 1000000000 } // 1 billion (unlimited)
     };
     
     const userLimits = limits[subscriptionType as keyof typeof limits] || limits.free;
@@ -353,6 +353,43 @@ export const humanizeText = onRequest({secrets: [openaiApiKey], ...corsOptions},
         subscriptionType
       });
       return;
+    }
+
+    // Check monthly limit for paid users
+    if (userLimits.monthlyWords > 0 && userEmail && userSubscription) {
+      // Get current monthly usage from database
+      const db = getFirestore();
+      const sanitizedEmail = userEmail.replace(/[\.#$\[\]@]/g, (match: string) => {
+        if (match === '@') return '_at_';
+        return '_';
+      });
+      
+      const userRef = db.collection('users').doc(sanitizedEmail);
+      const userDoc = await userRef.get();
+      const userData = userDoc.data();
+      
+      const currentMonthlyUsage = userData?.usage?.monthlyWordsUsed || 0;
+      
+      if (currentMonthlyUsage >= userLimits.monthlyWords) {
+        res.status(400).json({ 
+          error: `Monthly limit reached for ${subscriptionType} plan. You have used ${currentMonthlyUsage} of ${userLimits.monthlyWords} words this month.`,
+          limit: userLimits.monthlyWords,
+          current: currentMonthlyUsage,
+          subscriptionType
+        });
+        return;
+      }
+      
+      if (currentMonthlyUsage + wordCount > userLimits.monthlyWords) {
+        res.status(400).json({ 
+          error: `This request would exceed your monthly limit. You have ${userLimits.monthlyWords - currentMonthlyUsage} words remaining.`,
+          limit: userLimits.monthlyWords,
+          current: currentMonthlyUsage,
+          remaining: userLimits.monthlyWords - currentMonthlyUsage,
+          subscriptionType
+        });
+        return;
+      }
     }
 
     // Track usage if user is authenticated

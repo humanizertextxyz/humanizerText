@@ -41,7 +41,7 @@ export const createStripeProducts = onRequest(
       // Create Pro Plan
       const proProduct = await stripe.products.create({
         name: 'Pro Plan',
-        description: '500 words per process, All modes and settings, Advanced options, Priority support',
+        description: '20,000 words per month, 500 words per process, All modes and settings, Advanced options, Priority support',
       });
 
       const proMonthlyPrice = await stripe.prices.create({
@@ -63,7 +63,7 @@ export const createStripeProducts = onRequest(
       // Create Premium Plan
       const premiumProduct = await stripe.products.create({
         name: 'Premium Plan',
-        description: 'Unlimited words per process, All modes and settings, Advanced options, Priority support',
+        description: '50,000 words per month, Unlimited words per process, All modes and settings, Advanced options, Priority support',
       });
 
       const premiumMonthlyPrice = await stripe.prices.create({
@@ -85,7 +85,7 @@ export const createStripeProducts = onRequest(
       // Create Platinum Plan
       const platinumProduct = await stripe.products.create({
         name: 'Platinum Plan',
-        description: '1,000,000 words per month, Unlimited words per process, All modes and settings, Advanced options, Priority support',
+        description: '∞ words per month, Unlimited words per process, All modes and settings, Advanced options, Priority support',
       });
 
       const platinumMonthlyPrice = await stripe.prices.create({

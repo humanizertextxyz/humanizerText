@@ -27,10 +27,11 @@ export const SUBSCRIPTION_TIERS: Record<string, SubscriptionTier> = {
     name: 'Pro',
     type: 'pro',
     dailyWords: 0, // Not applicable for paid tiers
-    monthlyWords: 0, // No monthly limit for Pro
+    monthlyWords: 20000, // 20,000 words per month
     wordsPerProcess: 500,
     price: 9.99,
     features: [
+      '20,000 words per month',
       '500 words per process',
       'All modes and settings',
       'Advanced options',
@@ -41,10 +42,11 @@ export const SUBSCRIPTION_TIERS: Record<string, SubscriptionTier> = {
     name: 'Premium',
     type: 'premium',
     dailyWords: 0, // Not applicable for paid tiers
-    monthlyWords: 0, // No monthly limit for Premium
+    monthlyWords: 50000, // 50,000 words per month
     wordsPerProcess: 0, // Unlimited
     price: 19.99,
     features: [
+      '50,000 words per month',
       'Unlimited words per process',
       'All modes and settings',
       'Advanced options',
@@ -55,11 +57,11 @@ export const SUBSCRIPTION_TIERS: Record<string, SubscriptionTier> = {
     name: 'Platinum',
     type: 'platinum',
     dailyWords: 0, // Not applicable for paid tiers
-    monthlyWords: 1000000, // 1 million words per month
+    monthlyWords: 1000000000, // 1 billion words (unlimited)
     wordsPerProcess: 0, // Unlimited
-    price: 0, // Will be set dynamically
+    price: 49.99,
     features: [
-      '1,000,000 words per month',
+      '∞ words per month',
       'Unlimited words per process',
       'All modes and settings',
       'Advanced options',
@@ -152,8 +154,8 @@ export const canUserProcessText = (
     }
   }
   
-  // Check monthly limit for paid users (only Platinum has monthly limit)
-  if (tier.type === 'platinum' && tier.monthlyWords > 0) {
+  // Check monthly limit for paid users
+  if (tier.type !== 'free' && tier.monthlyWords > 0) {
     if (monthlyWordsUsed >= tier.monthlyWords) {
       return {
         canProcess: false,
@@ -190,20 +192,28 @@ export const getWordsRemaining = (
   }
   
   // For paid tiers, show appropriate limits
-  if (tier.type === 'platinum' && tier.monthlyWords > 0) {
-    const monthlyRemaining = Math.max(0, tier.monthlyWords - monthlyWordsUsed);
-    return {
-      daily: 0,
-      monthly: monthlyRemaining,
-      displayText: `${monthlyRemaining} words left (Monthly)`
-    };
+  if (tier.type !== 'free') {
+    if (tier.monthlyWords > 0) {
+      const monthlyRemaining = Math.max(0, tier.monthlyWords - monthlyWordsUsed);
+      return {
+        daily: 0,
+        monthly: monthlyRemaining,
+        displayText: `${monthlyRemaining} words left (Monthly)`
+      };
+    } else {
+      // Unlimited monthly
+      return {
+        daily: 0,
+        monthly: -1, // -1 indicates unlimited
+        displayText: 'Unlimited words (Monthly)'
+      };
+    }
   }
   
-  // For Pro and Premium (unlimited monthly), show unlimited
   return {
     daily: 0,
-    monthly: -1, // -1 indicates unlimited
-    displayText: 'Unlimited words (Monthly)'
+    monthly: 0,
+    displayText: 'No monthly limit'
   };
 };
 
@@ -223,14 +233,14 @@ export const getUsagePercentage = (
     return Math.min(100, (dailyWordsUsed / tier.dailyWords) * 100);
   }
   
-  // For Pro and Premium (unlimited monthly), show 0% usage
-  if (tier.type === 'pro' || tier.type === 'premium') {
-    return 0;
+  // For paid tiers, calculate percentage of monthly limit
+  if (tier.type !== 'free' && tier.monthlyWords > 0) {
+    return Math.min(100, (monthlyWordsUsed / tier.monthlyWords) * 100);
   }
   
-  // For Platinum, calculate percentage of monthly limit
-  if (tier.type === 'platinum' && tier.monthlyWords > 0) {
-    return Math.min(100, (monthlyWordsUsed / tier.monthlyWords) * 100);
+  // For unlimited monthly plans, show 0% usage
+  if (tier.type !== 'free' && tier.monthlyWords === 0) {
+    return 0;
   }
   
   return 0;
