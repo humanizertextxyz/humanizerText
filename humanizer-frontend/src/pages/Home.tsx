@@ -110,14 +110,23 @@ const callHttpFunction = async (functionName: string, data: any) => {
   let functionUrl;
   
   if (functionName === 'humanizeText') {
-    functionUrl = process.env.REACT_APP_HUMANIZE_FUNCTION_URL;
+    functionUrl = process.env.REACT_APP_HUMANIZE_FUNCTION_URL || 'https://humanizetext-qq6lep6f5a-uc.a.run.app';
   } else if (functionName === 'iterativeHumanizeText') {
-    functionUrl = process.env.REACT_APP_ITERATIVE_HUMANIZE_FUNCTION_URL;
+    functionUrl = process.env.REACT_APP_ITERATIVE_HUMANIZE_FUNCTION_URL || 'https://us-central1-humanizertext-551ee.cloudfunctions.net/iterativeHumanizeText';
   } else {
-    functionUrl = process.env.REACT_APP_DETECT_AI_FUNCTION_URL;
+    functionUrl = process.env.REACT_APP_DETECT_AI_FUNCTION_URL || 'https://detectaitext-qq6lep6f5a-uc.a.run.app';
+  }
+  
+  // Debug logging
+  console.log('Calling function:', functionName);
+  console.log('Function URL:', functionUrl);
+  
+  // Check if URL is undefined
+  if (!functionUrl) {
+    throw new Error(`Function URL not found for ${functionName}. Please check environment variables.`);
   }
     
-  const response = await fetch(functionUrl!, {
+  const response = await fetch(functionUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -126,11 +135,26 @@ const callHttpFunction = async (functionName: string, data: any) => {
   });
   
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || `HTTP error! status: ${response.status}`);
+    let errorMessage = `HTTP error! status: ${response.status}`;
+    try {
+      const error = await response.json();
+      errorMessage = error.error || errorMessage;
+    } catch (e) {
+      // If response isn't JSON, use status text
+      errorMessage = response.statusText || errorMessage;
+    }
+    throw new Error(errorMessage);
   }
   
-  const result = await response.json();
+  let result;
+  try {
+    result = await response.json();
+  } catch (e) {
+    console.error('JSON parsing error:', e);
+    console.error('Response text:', await response.text());
+    throw new Error('Invalid JSON response from server');
+  }
+  
   return { data: result.result };
 };
 
