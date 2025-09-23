@@ -88,6 +88,10 @@ interface HumanizationResult {
   original_text: string;
   humanized_text: string;
   method: string;
+  progress?: any[];
+  iterations?: number;
+  final_ai_percentage?: number;
+  note?: string;
 }
 
 // Detection Service Interface
@@ -103,9 +107,15 @@ interface DetectionService {
 
 // Call HTTP functions directly
 const callHttpFunction = async (functionName: string, data: any) => {
-  const functionUrl = functionName === 'humanizeText' 
-    ? process.env.REACT_APP_HUMANIZE_FUNCTION_URL 
-    : process.env.REACT_APP_DETECT_AI_FUNCTION_URL;
+  let functionUrl;
+  
+  if (functionName === 'humanizeText') {
+    functionUrl = process.env.REACT_APP_HUMANIZE_FUNCTION_URL;
+  } else if (functionName === 'iterativeHumanizeText') {
+    functionUrl = process.env.REACT_APP_ITERATIVE_HUMANIZE_FUNCTION_URL;
+  } else {
+    functionUrl = process.env.REACT_APP_DETECT_AI_FUNCTION_URL;
+  }
     
   const response = await fetch(functionUrl!, {
     method: 'POST',
@@ -135,6 +145,8 @@ const Home: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isLoadingSettings, setIsLoadingSettings] = useState(false);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [iterativeMode, setIterativeMode] = useState(false);
+  const [iterativeProgress, setIterativeProgress] = useState<any[]>([]);
   const [writingStyle, setWritingStyle] = useState('professional');
   const [textLength, setTextLength] = useState('maintain');
   const [customInstructions, setCustomInstructions] = useState('');
@@ -416,7 +428,8 @@ const Home: React.FC = () => {
     setHumanizationResult(null);
     
     try {
-      const result = await callHttpFunction('humanizeText', {
+      const functionName = iterativeMode ? 'iterativeHumanizeText' : 'humanizeText';
+      const result = await callHttpFunction(functionName, {
         text: inputText,
         writingStyle: writingStyle,
         textLength: textLength,
@@ -435,6 +448,11 @@ const Home: React.FC = () => {
       });
       
       const data = result.data as HumanizationResult;
+      
+      // Handle iterative progress if available
+      if (data.progress && Array.isArray(data.progress)) {
+        setIterativeProgress(data.progress);
+      }
       
       // FRONTEND DASH REMOVAL - Clean the text after receiving from Firebase
       let cleanedText = data.humanized_text;
@@ -844,6 +862,28 @@ const Home: React.FC = () => {
                     },
                   }}
                 />
+                
+                {/* Iterative Progress Display */}
+                {iterativeMode && iterativeProgress.length > 0 && (
+                  <Box sx={{ mt: 2, p: 2, backgroundColor: 'rgba(26, 26, 46, 0.6)', borderRadius: 2, border: '1px solid rgba(99, 102, 241, 0.2)' }}>
+                    <Typography variant="h6" sx={{ color: 'white', mb: 1, fontSize: '1rem' }}>
+                      🎯 Iterative Progress
+                    </Typography>
+                    {iterativeProgress.map((step, index) => (
+                      <Box key={index} sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', minWidth: '80px' }}>
+                          Iteration {step.iteration}:
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: step.ai_percentage === 0 ? '#22c55e' : '#fbbf24' }}>
+                          {step.ai_percentage}% AI detected
+                        </Typography>
+                        {step.status === 're-humanizing' && (
+                          <CircularProgress size={16} sx={{ color: '#667eea' }} />
+                        )}
+                      </Box>
+                    ))}
+                  </Box>
+                )}
               </Box>
             </Box>
 
@@ -916,6 +956,33 @@ const Home: React.FC = () => {
                 <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)', mb: 1.5, fontWeight: 500 }}>
                   &nbsp;
                 </Typography>
+                
+                {/* Iterative Mode Toggle */}
+                <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <input
+                    type="checkbox"
+                    id="iterativeMode"
+                    checked={iterativeMode}
+                    onChange={(e) => setIterativeMode(e.target.checked)}
+                    style={{
+                      width: '16px',
+                      height: '16px',
+                      accentColor: '#667eea'
+                    }}
+                  />
+                  <label 
+                    htmlFor="iterativeMode" 
+                    style={{ 
+                      color: 'rgba(255,255,255,0.8)', 
+                      fontSize: '0.9rem',
+                      cursor: 'pointer',
+                      userSelect: 'none'
+                    }}
+                  >
+                    🎯 Iterative Mode (0% AI Detection)
+                  </label>
+                </Box>
+                
               <Button
                   variant="outlined"
                   onClick={handleAdvancedSettings}
