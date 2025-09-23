@@ -18,7 +18,7 @@ import {
   Logout as LogoutIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
-import { getSubscriptionTier, getPlanColor } from '../utils/subscription';
+import { getSubscriptionTier, getPlanColor, getWordsRemaining } from '../utils/subscription';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { useNavigate } from 'react-router-dom';
@@ -97,7 +97,8 @@ const Account: React.FC = () => {
   const tier = getSubscriptionTier(localUserData?.subscription.type || 'free');
   const dailyWordsUsed = localUserData?.usage.dailyWordsUsed || 0;
   const monthlyWordsUsed = localUserData?.usage.monthlyWordsUsed || 0;
-  const wordsRemaining = tier.type === 'free' ? tier.dailyWords - dailyWordsUsed : tier.monthlyWords - monthlyWordsUsed;
+  const wordsRemainingData = getWordsRemaining(localUserData?.subscription.type || 'free', dailyWordsUsed, monthlyWordsUsed);
+  const wordsRemaining = wordsRemainingData.monthly === -1 ? '∞' : (tier.type === 'free' ? tier.dailyWords - dailyWordsUsed : tier.monthlyWords - monthlyWordsUsed);
   const wordsPerProcess = tier.wordsPerProcess;
 
   const handleLogout = async () => {
@@ -301,13 +302,13 @@ const Account: React.FC = () => {
               {/* Words Remaining */}
               <Box>
                 <Typography variant="h3" sx={{ color: '#22c55e', fontWeight: 700, mb: 1, fontSize: { xs: '2rem', md: '3rem' } }}>
-                  {wordsRemaining.toLocaleString()}
+                  {wordsRemaining === '∞' ? '∞' : wordsRemaining.toLocaleString()}
                 </Typography>
                 <Typography variant="body1" sx={{ color: 'white', mb: 1, fontSize: { xs: '0.9rem', md: '1rem' } }}>
                   Words remaining {tier.type === 'free' ? 'today' : 'this month'}
                 </Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.8rem', md: '0.9rem' } }}>
-                  {tier.type === 'free' ? 'Daily' : 'Monthly'} limit: {tier.type === 'free' ? tier.dailyWords.toLocaleString() : tier.monthlyWords.toLocaleString()} words
+                  {tier.type === 'free' ? 'Daily' : 'Monthly'} limit: {tier.type === 'free' ? tier.dailyWords.toLocaleString() : (tier.type === 'platinum' ? '∞' : tier.monthlyWords.toLocaleString())} words
                 </Typography>
               </Box>
 
