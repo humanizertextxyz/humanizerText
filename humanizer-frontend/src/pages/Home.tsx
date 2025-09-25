@@ -113,6 +113,8 @@ const callHttpFunction = async (functionName: string, data: any) => {
     functionUrl = process.env.REACT_APP_HUMANIZE_FUNCTION_URL || 'https://humanizetext-qq6lep6f5a-uc.a.run.app';
   } else if (functionName === 'iterativeHumanizeText') {
     functionUrl = process.env.REACT_APP_ITERATIVE_HUMANIZE_FUNCTION_URL || 'https://us-central1-humanizertext-551ee.cloudfunctions.net/iterativeHumanizeText';
+  } else if (functionName === 'mistralHumanizeText') {
+    functionUrl = process.env.REACT_APP_MISTRAL_HUMANIZE_FUNCTION_URL || 'https://us-central1-humanizertext-551ee.cloudfunctions.net/mistralHumanizeText';
   } else {
     functionUrl = process.env.REACT_APP_DETECT_AI_FUNCTION_URL || 'https://detectaitext-qq6lep6f5a-uc.a.run.app';
   }
@@ -171,6 +173,7 @@ const Home: React.FC = () => {
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [iterativeMode, setIterativeMode] = useState(false);
   const [iterativeProgress, setIterativeProgress] = useState<any[]>([]);
+  const [mistralMode, setMistralMode] = useState(false);
   const [writingStyle, setWritingStyle] = useState('professional');
   const [textLength, setTextLength] = useState('maintain');
   const [customInstructions, setCustomInstructions] = useState('');
@@ -452,7 +455,13 @@ const Home: React.FC = () => {
     setHumanizationResult(null);
     
     try {
-      const functionName = iterativeMode ? 'iterativeHumanizeText' : 'humanizeText';
+      let functionName = 'humanizeText';
+      if (mistralMode) {
+        functionName = 'mistralHumanizeText';
+      } else if (iterativeMode) {
+        functionName = 'iterativeHumanizeText';
+      }
+      
       const result = await callHttpFunction(functionName, {
         text: inputText,
         writingStyle: writingStyle,
@@ -981,30 +990,63 @@ const Home: React.FC = () => {
                   &nbsp;
                 </Typography>
                 
-                {/* Iterative Mode Toggle */}
-                <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <input
-                    type="checkbox"
-                    id="iterativeMode"
-                    checked={iterativeMode}
-                    onChange={(e) => setIterativeMode(e.target.checked)}
-                    style={{
-                      width: '16px',
-                      height: '16px',
-                      accentColor: '#667eea'
-                    }}
-                  />
-                  <label 
-                    htmlFor="iterativeMode" 
-                    style={{ 
-                      color: 'rgba(255,255,255,0.8)', 
-                      fontSize: '0.9rem',
-                      cursor: 'pointer',
-                      userSelect: 'none'
-                    }}
-                  >
-                    🎯 Iterative Mode (0% AI Detection)
-                  </label>
+                {/* AI Model Selection */}
+                <Box sx={{ mb: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <input
+                      type="checkbox"
+                      id="iterativeMode"
+                      checked={iterativeMode}
+                      onChange={(e) => {
+                        setIterativeMode(e.target.checked);
+                        if (e.target.checked) setMistralMode(false);
+                      }}
+                      style={{
+                        width: '16px',
+                        height: '16px',
+                        accentColor: '#667eea'
+                      }}
+                    />
+                    <label 
+                      htmlFor="iterativeMode" 
+                      style={{ 
+                        color: 'rgba(255,255,255,0.8)', 
+                        fontSize: '0.9rem',
+                        cursor: 'pointer',
+                        userSelect: 'none'
+                      }}
+                    >
+                      🎯 Iterative Mode (0% AI Detection)
+                    </label>
+                  </Box>
+                  
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <input
+                      type="checkbox"
+                      id="mistralMode"
+                      checked={mistralMode}
+                      onChange={(e) => {
+                        setMistralMode(e.target.checked);
+                        if (e.target.checked) setIterativeMode(false);
+                      }}
+                      style={{
+                        width: '16px',
+                        height: '16px',
+                        accentColor: '#f59e0b'
+                      }}
+                    />
+                    <label 
+                      htmlFor="mistralMode" 
+                      style={{ 
+                        color: 'rgba(255,255,255,0.8)', 
+                        fontSize: '0.9rem',
+                        cursor: 'pointer',
+                        userSelect: 'none'
+                      }}
+                    >
+                      🧠 Mistral AI (High Creativity)
+                    </label>
+                  </Box>
                 </Box>
                 
               <Button
