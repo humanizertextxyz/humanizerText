@@ -518,7 +518,15 @@ const Home: React.FC = () => {
       
     } catch (error: any) {
       console.error('Humanization Error:', error);
-      setOutputText('Error: ' + (error.message || 'Failed to humanize text'));
+      
+      // Handle specific Mistral AI errors
+      if (mistralMode && error.message?.includes('Mistral AI service is currently at capacity')) {
+        setOutputText('Error: Mistral AI is currently at capacity. Please try again in a few minutes or use a different AI model.');
+      } else if (mistralMode && error.message?.includes('Mistral AI rate limit exceeded')) {
+        setOutputText('Error: Mistral AI rate limit exceeded. Please try again later or use a different AI model.');
+      } else {
+        setOutputText('Error: ' + (error.message || 'Failed to humanize text'));
+      }
     } finally {
       setIsProcessing(false);
     }

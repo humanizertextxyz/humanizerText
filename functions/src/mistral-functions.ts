@@ -215,21 +215,50 @@ Extra ask: ${customRequest || ''}
 ${text}`;
 
   try {
-    const response = await axios.post('https://api.mistral.ai/v1/chat/completions', {
-      model: 'mistral-large-latest',
-      messages: [
-        { role: 'user', content: prompt }
-      ],
-      temperature: 1.0, // Highest temperature
-      top_p: 1.0, // Highest top_p
-      max_tokens: 2000
-    }, {
-      headers: {
-        'Authorization': `Bearer ${mistralApiKey.value()}`,
-        'Content-Type': 'application/json'
-      },
-      timeout: 60000
-    });
+    // Try mistral-large-latest first, fallback to mistral-small-latest if capacity exceeded
+    let model = 'mistral-large-latest';
+    let response;
+    
+    try {
+      response = await axios.post('https://api.mistral.ai/v1/chat/completions', {
+        model: model,
+        messages: [
+          { role: 'user', content: prompt }
+        ],
+        temperature: 1.0, // Highest temperature
+        top_p: 1.0, // Highest top_p
+        max_tokens: 2000
+      }, {
+        headers: {
+          'Authorization': `Bearer ${mistralApiKey.value()}`,
+          'Content-Type': 'application/json'
+        },
+        timeout: 60000
+      });
+    } catch (firstError: any) {
+      // If capacity exceeded, try with smaller model
+      if (firstError.response?.status === 429 && firstError.response?.data?.type === 'service_tier_capacity_exceeded') {
+        console.log('Large model at capacity, trying smaller model...');
+        model = 'mistral-small-latest';
+        response = await axios.post('https://api.mistral.ai/v1/chat/completions', {
+          model: model,
+          messages: [
+            { role: 'user', content: prompt }
+          ],
+          temperature: 1.0,
+          top_p: 1.0,
+          max_tokens: 2000
+        }, {
+          headers: {
+            'Authorization': `Bearer ${mistralApiKey.value()}`,
+            'Content-Type': 'application/json'
+          },
+          timeout: 60000
+        });
+      } else {
+        throw firstError;
+      }
+    }
 
     const result = response.data.choices[0]?.message?.content?.trim() || text;
     
@@ -243,9 +272,24 @@ ${text}`;
     resultCleaned = resultCleaned.replace(/‒/g, ", ");
     
     return resultCleaned;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Mistral API Error:', error);
-    throw new Error('Temporary error, please try again later');
+    
+    // Handle specific Mistral API errors
+    if (error.response?.status === 429) {
+      const errorData = error.response.data;
+      if (errorData?.type === 'service_tier_capacity_exceeded') {
+        throw new Error('Mistral AI service is currently at capacity. Please try again in a few minutes or use a different AI model.');
+      } else {
+        throw new Error('Mistral AI rate limit exceeded. Please try again later or use a different AI model.');
+      }
+    } else if (error.response?.status === 401) {
+      throw new Error('Mistral AI authentication failed. Please contact support.');
+    } else if (error.response?.status === 400) {
+      throw new Error('Invalid request to Mistral AI. Please try with different text.');
+    } else {
+      throw new Error('Mistral AI service temporarily unavailable. Please try again later or use a different AI model.');
+    }
   }
 }
 
