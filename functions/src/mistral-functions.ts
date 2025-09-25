@@ -187,32 +187,45 @@ async function generateMistralHumanizedText(
   const lengthInstruction = getLengthInstruction(textLength);
   
   // Same prompt as OpenAI version
-  const prompt = `Humanize the TEXT: Keep every core idea, fact, name, number, and logic chain exact. No adds or cuts. Just reshape it into a natural, meandering chat, like scribbling notes after coffee.
+  const prompt = `Rewrite the TEXT with the same meaning but a different style, tone, and structure. Follow this rubric strictly:
 
-Strict Guide:
-1. Word Weirdness: Twist 35%+ of main terms with quirky fits (e.g., "innovation" to "wild spark"). No cookie-cutter words.
-2. Rhythm Jumble: 
-   - Half your lines? Snappy bits under 8 words. Like this.
-   - Third? Breezy 12-18 word flows.
-   - Rest? Windy ones, 30-40 words, packing in a detour or two.
-   Drop a half-thought fragment. Sneak a "wait, yeah" aside mid-sentence.
-3. Wobble Lightly: Flip tempos once or twice; go wry, then earnest. Slip in a tiny glitch, like run-together thoughts or "sorta."
-4. No Loops: Fresh starts every time. Dodge word tag-teams (quick/nimble? Pick one path).
-5. True Blue: Mirror the original's intent and order dead-on.
+A. Perplexity (High)
+* Use unexpected yet fitting verbs and nouns; avoid stock phrases.
+* Replace at least 30% of content words with strong synonyms or rephrasings.
+* Avoid formulaic connectors ("in conclusion," "overall," etc.).
+B. Burstiness (High)
+* Sentence mix:
+    * 40–60% short (≤10 words),
+    * 25–40% medium (11–20 words),
+    * 10–20% long (28–45 words).
+* Include 1 fragment and 1 parenthetical or brief self-correction.
+C. Consistency (Slightly Lower)
+* Have many mild shifts in tone/tempo (e.g., a quick aside).
+* Keep grammar readable; include small, human imperfections.
+D. Anti-Repetition
+* Do not repeat distinctive phrases, sentence starters, or rhetorical patterns.
+* Avoid near-duplicates and synonym ping-pong (e.g., cycling "rapid/fast/quick").
+E. Fidelity
+* Keep all facts, relationships, and logical order intact. Do not add claims.
+* Preserve core meaning of the text,named entities, quantities, and cause-effect links.
+Output Rules (IMPORTANT)
+* Inclue unnoticable Imperfection
+* Return only the rewritten text, no commentary.
+* ${lengthInstruction}
+* DO NOT INCLUDE EM DASHES "—" ANYWHERE IN YOUR OUTPUT AT ALL!
+* REMOVE ALL EM DASHES "—" FROM THE INPUT TEXT AND REPLACE WITH APPROPRIATE PUNCTUATION (commas, periods, or semicolons)
 
-Output: Just the text. Nothing else. Match length vibe: ${lengthInstruction}
-Kill all em-dashes! Comma or period swap, always.
-Ban: overused sayings, smileys, biz jargon, those dashes${prohibitedItems ? `, plus ${prohibitedItems}` : ''}.
+${text}
 
-Extras (ignore blanks):
-Verbatim keeps: ${keywordsToPreserve || ''}
-Read-easy level: ${readingLevel || ''}
-Tone bounds: ${toneGuardrails || ''}
-View from: ${personaLens || ''}
-Style vibe: ${writingStyle || ''}
-Extra ask: ${customRequest || ''}
-
-${text}`;
+Optional Add-Ons (If nothing is listed, skip over it)
+* Keywords to preserve verbatim: ${keywordsToPreserve || ''}
+* Reading level target: ${readingLevel || ''}
+* Tone guardrails: ${toneGuardrails || ''}
+* Prohibited items: clichés, emojis, corporate buzzwords, em dashes (—)${prohibitedItems ? `, ${prohibitedItems}` : ''}.
+* Persona lens: ${personaLens || ''}
+* Writing Style: ${writingStyle || ''}
+* Custom Request: ${customRequest || ''}
+`;
 
   try {
     // Try mistral-large-latest first, fallback to mistral-small-latest if capacity exceeded
