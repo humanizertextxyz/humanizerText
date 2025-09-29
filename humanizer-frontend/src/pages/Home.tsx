@@ -458,14 +458,8 @@ const Home: React.FC = () => {
     setHumanizationResult(null);
     
     try {
-      let functionName = 'humanizeText';
-      if (doubleMode) {
-        functionName = 'doubleHumanizeText';
-      } else if (mistralMode) {
-        functionName = 'mistralHumanizeText';
-      } else if (iterativeMode) {
-        functionName = 'iterativeHumanizeText';
-      }
+      // Always use double humanization
+      const functionName = 'doubleHumanizeText';
       
       const result = await callHttpFunction(functionName, {
         text: inputText,
@@ -1003,98 +997,6 @@ const Home: React.FC = () => {
                   &nbsp;
                 </Typography>
                 
-                {/* AI Model Selection */}
-                <Box sx={{ mb: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <input
-                      type="checkbox"
-                      id="iterativeMode"
-                      checked={iterativeMode}
-                      onChange={(e) => {
-                        setIterativeMode(e.target.checked);
-                        if (e.target.checked) setMistralMode(false);
-                      }}
-                      style={{
-                        width: '16px',
-                        height: '16px',
-                        accentColor: '#667eea'
-                      }}
-                    />
-                    <label 
-                      htmlFor="iterativeMode" 
-                      style={{ 
-                        color: 'rgba(255,255,255,0.8)', 
-                        fontSize: '0.9rem',
-                        cursor: 'pointer',
-                        userSelect: 'none'
-                      }}
-                    >
-                      🎯 Iterative Mode (0% AI Detection)
-                    </label>
-                  </Box>
-                  
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <input
-                      type="checkbox"
-                      id="mistralMode"
-                      checked={mistralMode}
-                      onChange={(e) => {
-                        setMistralMode(e.target.checked);
-                        if (e.target.checked) {
-                          setIterativeMode(false);
-                          setDoubleMode(false);
-                        }
-                      }}
-                      style={{
-                        width: '16px',
-                        height: '16px',
-                        accentColor: '#f59e0b'
-                      }}
-                    />
-                    <label 
-                      htmlFor="mistralMode" 
-                      style={{ 
-                        color: 'rgba(255,255,255,0.8)', 
-                        fontSize: '0.9rem',
-                        cursor: 'pointer',
-                        userSelect: 'none'
-                      }}
-                    >
-                      🧠 Mistral AI (High Creativity)
-                    </label>
-                  </Box>
-                  
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <input
-                      type="checkbox"
-                      id="doubleMode"
-                      checked={doubleMode}
-                      onChange={(e) => {
-                        setDoubleMode(e.target.checked);
-                        if (e.target.checked) {
-                          setIterativeMode(false);
-                          setMistralMode(false);
-                        }
-                      }}
-                      style={{
-                        width: '16px',
-                        height: '16px',
-                        accentColor: '#8b5cf6'
-                      }}
-                    />
-                    <label 
-                      htmlFor="doubleMode" 
-                      style={{ 
-                        color: 'rgba(255,255,255,0.8)', 
-                        fontSize: '0.9rem',
-                        cursor: 'pointer',
-                        userSelect: 'none'
-                      }}
-                    >
-                      🔄 Double Humanization (2x Processing)
-                    </label>
-                  </Box>
-                </Box>
                 
               <Button
                   variant="outlined"

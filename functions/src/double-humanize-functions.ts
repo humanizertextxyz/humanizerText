@@ -88,14 +88,10 @@ export const doubleHumanizeText = onRequest({...corsOptions}, async (req, res) =
       return;
     }
 
-    // Create response
+    // Create response (only final result)
     const responseData = {
       success: true,
-      original_text: text,
-      humanized_text: result.second_result,
-      method: 'double_humanization',
-      first_result: result.first_result,
-      iterations: 2
+      humanized_text: result.second_result
     };
     
     res.status(200).json({ result: responseData });
@@ -209,8 +205,8 @@ async function humanizeText(session: any, text: string, attemptName: string, max
           if (completionId) {
             console.log(`✅ Got completion ID: ${completionId}`);
             
-            // Progressive wait times: 15, 20, 30 seconds (matching Python)
-            const waitTimes = [15000, 20000, 30000];
+            // Progressive wait times: 5, 10, 15, 30 seconds
+            const waitTimes = [5000, 10000, 15000, 30000];
             const waitTime = waitTimes[Math.min(attempt, waitTimes.length - 1)];
             console.log(`⏳ Waiting ${waitTime / 1000} seconds for processing...`);
             await new Promise(resolve => setTimeout(resolve, waitTime));
