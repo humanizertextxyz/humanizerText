@@ -1,7 +1,12 @@
 import {onRequest} from "firebase-functions/v2/https";
+import {defineSecret} from "firebase-functions/params";
 import {getFirestore} from "firebase-admin/firestore";
 import axios from "axios";
 import { v4 as uuidv4 } from 'uuid';
+import OpenAI from "openai";
+
+// Define the OpenAI API key as a secret
+const openaiApiKey = defineSecret("OPENAI_API_KEY");
 
 // CORS configuration
 const corsOptions = {
@@ -18,7 +23,7 @@ const USER_AGENTS = [
 ];
 
 // Double Humanization Function
-export const doubleHumanizeText = onRequest({...corsOptions}, async (req, res) => {
+export const doubleHumanizeText = onRequest({secrets: [openaiApiKey], ...corsOptions}, async (req, res) => {
   // Set CORS headers
   res.set('Access-Control-Allow-Origin', 'https://humanizertext.xyz');
   res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -107,8 +112,23 @@ export const doubleHumanizeText = onRequest({...corsOptions}, async (req, res) =
   }
 });
 
-// Core double humanization logic
+// Core double humanization logic with fallback
 async function runDoubleHumanization(text: string): Promise<any> {
+  try {
+    // Try GPTinf first
+    console.log('🔄 Attempting GPTinf double humanization...');
+    return await runGptinfDoubleHumanization(text);
+  } catch (gptinfError) {
+    console.log('❌ GPTinf failed, falling back to OpenAI double humanization...');
+    console.error('GPTinf error:', gptinfError);
+    
+    // Fallback to OpenAI double humanization
+    return await runOpenAIDoubleHumanization(text);
+  }
+}
+
+// GPTinf double humanization (original approach)
+async function runGptinfDoubleHumanization(text: string): Promise<any> {
   const baseUrl = "https://www.gptinf.com";
   
   // Create session with rotated headers
@@ -134,36 +154,71 @@ async function runDoubleHumanization(text: string): Promise<any> {
   // Set cookies with 500 free words
   session.defaults.headers.common['Cookie'] = generateCookies();
 
-  try {
-    // First humanization
-    console.log('🔄 Starting first humanization...');
-    const firstResult = await humanizeText(session, text, 'First Humanization');
-    
-    if (!firstResult) {
-      throw new Error('First humanization failed');
-    }
-
-    // Add delay between requests
-    await new Promise(resolve => setTimeout(resolve, 2000 + Math.random() * 3000));
-
-    // Second humanization using first result
-    console.log('🔄 Starting second humanization...');
-    const secondResult = await humanizeText(session, firstResult, 'Second Humanization');
-    
-    if (!secondResult) {
-      throw new Error('Second humanization failed');
-    }
-
-    return {
-      original: text,
-      first_result: firstResult,
-      second_result: secondResult
-    };
-
-  } catch (error) {
-    console.error('Double humanization error:', error);
-    throw error;
+  // First humanization
+  console.log('🔄 Starting first humanization...');
+  const firstResult = await humanizeText(session, text, 'First Humanization');
+  
+  if (!firstResult) {
+    throw new Error('First humanization failed');
   }
+
+  // Add delay between requests
+  await new Promise(resolve => setTimeout(resolve, 2000 + Math.random() * 3000));
+
+  // Second humanization using first result
+  console.log('🔄 Starting second humanization...');
+  const secondResult = await humanizeText(session, firstResult, 'Second Humanization');
+  
+  if (!secondResult) {
+    throw new Error('Second humanization failed');
+  }
+
+  return {
+    original: text,
+    first_result: firstResult,
+    second_result: secondResult
+  };
+}
+
+// OpenAI double humanization fallback
+async function runOpenAIDoubleHumanization(text: string): Promise<any> {
+  console.log('🔄 Using OpenAI for double humanization...');
+  
+  // First humanization with OpenAI
+  const firstResult = await generateOpenAIHumanizedText(text);
+  
+  // Add delay between requests
+  await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
+  
+  // Second humanization using first result
+  const secondResult = await generateOpenAIHumanizedText(firstResult);
+  
+  return {
+    original: text,
+    first_result: firstResult,
+    second_result: secondResult
+  };
+}
+
+// OpenAI humanization helper
+async function generateOpenAIHumanizedText(text: string): Promise<string> {
+  const openai = new OpenAI({
+    apiKey: openaiApiKey.value()
+  });
+  
+  const prompt = `Rewrite this text to sound more natural and human-like. Make it conversational, varied in sentence structure, and add subtle imperfections that make it feel authentically human. Keep the same meaning and core information.
+
+Text: ${text}`;
+
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4",
+    messages: [{ role: "user", content: prompt }],
+    temperature: 0.8,
+    top_p: 0.9,
+    max_tokens: 2000
+  });
+
+  return completion.choices[0]?.message?.content?.trim() || text;
 }
 
 // Individual humanization step
