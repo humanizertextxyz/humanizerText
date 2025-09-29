@@ -221,69 +221,136 @@ Text: ${text}`;
   return completion.choices[0]?.message?.content?.trim() || text;
 }
 
-// Individual humanization step
-async function humanizeText(session: any, text: string, attemptName: string): Promise<string | null> {
-  try {
-    const sessionId = `session_${uuidv4().replace(/-/g, '').substring(0, 16)}`;
-    
-    // Step 1: Start processing
-    const startPayload = {
-      cacheMode: "start",
-      text: text,
-      model: "free2",
-      keywords: [],
-      sessionId: sessionId,
-      alg: 0,
-      trialNumber: 0
-    };
+// Individual humanization step with robust error handling (matching Python approach)
+async function humanizeText(session: any, text: string, attemptName: string, maxRetries: number = 3): Promise<string | null> {
+  console.log(`🔄 ${attemptName}...`);
+  console.log(`📝 Input text (${text.split(' ').length} words):`);
+  console.log(text);
+  console.log("\n" + "=".repeat(60));
 
-    const startResponse = await session.post('/api/process_free', startPayload);
-    
-    if (startResponse.status !== 200) {
-      throw new Error(`Start failed: ${startResponse.status}`);
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      console.log(`Attempt ${attempt + 1}/${maxRetries}`);
+      
+      const sessionId = `session_${uuidv4().replace(/-/g, '').substring(0, 16)}`;
+      console.log(`🆔 Session ID: ${sessionId}`);
+
+      // Step 1: Start processing
+      console.log("🔄 Starting processing...");
+      const startPayload = {
+        cacheMode: "start",
+        text: text,
+        model: "free2",
+        keywords: [],
+        sessionId: sessionId,
+        alg: 0,
+        trialNumber: 0
+      };
+
+      const startResponse = await session.post('/api/process_free', startPayload, { 
+        timeout: 30000, 
+        validateStatus: () => true 
+      });
+      
+      console.log(`Start status: ${startResponse.status}`);
+      
+      if (startResponse.status === 200) {
+        const startData = startResponse.data;
+        console.log(`Start response: ${JSON.stringify(startData)}`);
+        
+        if (startData.code === 'success') {
+          const completionId = startData.completionId;
+          if (completionId) {
+            console.log(`✅ Got completion ID: ${completionId}`);
+            
+            // Progressive wait times: 15, 20, 30 seconds (matching Python)
+            const waitTimes = [15000, 20000, 30000];
+            const waitTime = waitTimes[Math.min(attempt, waitTimes.length - 1)];
+            console.log(`⏳ Waiting ${waitTime / 1000} seconds for processing...`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+
+            // Step 2: Get results
+            console.log("🔄 Getting results...");
+            const getPayload = {
+              cacheMode: "get",
+              completionId: completionId,
+              sessionId: sessionId,
+              text: "",
+              token: ""
+            };
+
+            const getResponse = await session.post('/api/process_free', getPayload, { 
+              timeout: 30000, 
+              validateStatus: () => true 
+            });
+            
+            console.log(`Get status: ${getResponse.status}`);
+            
+            if (getResponse.status === 200) {
+              const resultData = getResponse.data;
+              console.log(`Get response: ${JSON.stringify(resultData)}`);
+              
+              if (resultData.result && resultData.result[0]?.text) {
+                const humanized = resultData.result[0].text;
+                console.log(`✅ ${attemptName} successful!`);
+                console.log(`📝 Output text (${humanized.split(' ').length} words):`);
+                console.log(humanized);
+                return humanized;
+              } else if (resultData.result === null) {
+                console.log("⏳ Still processing...");
+                if (attempt < maxRetries - 1) {
+                  await new Promise(resolve => setTimeout(resolve, 2000));
+                  continue;
+                }
+              } else {
+                console.error(`❌ Unexpected result: ${JSON.stringify(resultData)}`);
+                if (attempt < maxRetries - 1) {
+                  await new Promise(resolve => setTimeout(resolve, 2000));
+                  continue;
+                }
+              }
+            } else {
+              console.error(`❌ Get failed with status ${getResponse.status}: ${getResponse.data}`);
+              if (attempt < maxRetries - 1) {
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                continue;
+              }
+            }
+          } else {
+            console.error("❌ No completion ID in response");
+            if (attempt < maxRetries - 1) {
+              await new Promise(resolve => setTimeout(resolve, 2000));
+              continue;
+            }
+          }
+        } else {
+          console.error(`❌ Start failed: ${JSON.stringify(startData)}`);
+          if (attempt < maxRetries - 1) {
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            continue;
+          }
+        }
+      } else {
+        console.error(`❌ Start failed with status ${startResponse.status}: ${startResponse.data}`);
+        if (attempt < maxRetries - 1) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          continue;
+        }
+      }
+    } catch (error: any) {
+      console.error(`❌ Error on attempt ${attempt + 1}: ${error.message}`);
+      if (attempt < maxRetries - 1) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        continue;
+      }
     }
-
-    const startData = startResponse.data;
-    const completionId = startData.completionId;
-    
-    if (!completionId) {
-      throw new Error('No completion ID received');
-    }
-
-    // Step 2: Wait for processing
-    const waitTime = 15000 + Math.random() * 5000; // 15-20 seconds
-    await new Promise(resolve => setTimeout(resolve, waitTime));
-
-    // Step 3: Get results
-    const getPayload = {
-      cacheMode: "get",
-      completionId: completionId,
-      sessionId: sessionId,
-      text: "",
-      token: ""
-    };
-
-    const getResponse = await session.post('/api/process_free', getPayload);
-    
-    if (getResponse.status !== 200) {
-      throw new Error(`Get failed: ${getResponse.status}`);
-    }
-
-    const resultData = getResponse.data;
-    
-    if (resultData.result && resultData.result.length > 0) {
-      return resultData.result[0].text;
-    } else {
-      throw new Error('No result in response');
-    }
-
-  } catch (error) {
-    console.error(`${attemptName} error:`, error);
-    return null;
   }
+  
+  console.error(`❌ All ${maxRetries} attempts failed for ${attemptName}`);
+  return null;
 }
 
-// Generate cookies with 500 free words
+// Generate cookies with 500 free words (matching Python script exactly)
 function generateCookies(): string {
   const cookies = {
     '_fbp': 'fb.1.1759163539751.36833947124802341',
@@ -299,7 +366,7 @@ function generateCookies(): string {
     '_clsk': '8yyx5s%5E1759179410217%5E2%5E1%5Ej.clarity.ms%2Fcollect',
     'ttcsid': '1759179395056::RBty5wC_kedRXE4vne_I.2.1759179457177.0',
     'ttcsid_CP32RVRC77U6BDAC73HG': '1759179395056::ttqY1hmKj2BK2g_CToeb.2.1759179457177.0',
-    'freeWords': '500', // Set to 500 for good buffer
+    'freeWords': '500', // Set to 500 for good buffer (matching Python)
     'ph_phc_H4GAj9wCvMK8ZPAgyTyHitrkf0tOaznyhnVVq9POlQG_posthog': '%7B%22distinct_id%22%3A%2201999743-7223-7ec2-a575-0b3bc940779c%22%2C%22%24sesid%22%3A%5B1759179457179%2C%2201999743-7224-7ccf-b36b-5664e46a0f%22%2C1759179403811%5D%2C%22%24initial_person_info%22%3A%7B%22r%22%3A%22https%3A%2F%2Faccounts.google.com%2F%22%2C%22u%22%3A%22https%3A%2F%2Fwww.gptinf.com%2Faccount%22%7D%7D'
   };
 
