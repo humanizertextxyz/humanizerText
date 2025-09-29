@@ -358,7 +358,7 @@ function generateCookies(): string {
     '_ttp': '01K6B52RAK7CJSJJQ6CF41HVHM_.tt.1',
     '_ga': 'GA1.1.101199240.1759163540',
     '_clck': 'e7p5fq%5E2%5Efzq%5E0%5E2098',
-    'email': 'deenkulyawn%40gmail.com',
+    // 'email': 'user%40example.com', // Removed - not required
     '_gcl_au': '1.1.1268097366.1759163540.1448043288.1759179401.1759179401',
     'token': '',
     'cf_clearance': 'hcWbIly9T74uSgLCSX3irX2oI0vM96pogBw4aasX77Y-1759179404-1.2.1.1-r2GQ0bcpXGezHDYyNS5eXM3833riEw8_tD0HlzsiM2_2Sr2CntXqM0Hp0jOofhcfICNjst6N8eUnlfwUIAhNnTJBsC8ouFsJG6y1wa0YGPccZMQvLOTIF4UF37nB8xbS.qbdVtw2VHYsWX6rDXTfMwOEcsRjFIH8j8K6oj0HSEJUXgMNMNomRJUevmYFxcQv3_vXKzq1HAlUMxt9zjjNzak2lCxe9JzEFjqe7uHOuiI',
