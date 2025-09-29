@@ -11,6 +11,9 @@ export { createStripeProducts, createCheckoutSession, stripeWebhook, validateCou
 // Export Mistral functions
 export { mistralHumanizeText } from './mistral-functions';
 
+// Export Double Humanize functions
+export { doubleHumanizeText } from './double-humanize-functions';
+
 // Define the OpenAI API key as a secret
 const openaiApiKey = defineSecret("OPENAI_API_KEY");
 

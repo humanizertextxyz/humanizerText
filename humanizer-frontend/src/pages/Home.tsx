@@ -115,6 +115,8 @@ const callHttpFunction = async (functionName: string, data: any) => {
     functionUrl = process.env.REACT_APP_ITERATIVE_HUMANIZE_FUNCTION_URL || 'https://us-central1-humanizertext-551ee.cloudfunctions.net/iterativeHumanizeText';
   } else if (functionName === 'mistralHumanizeText') {
     functionUrl = process.env.REACT_APP_MISTRAL_HUMANIZE_FUNCTION_URL || 'https://us-central1-humanizertext-551ee.cloudfunctions.net/mistralHumanizeText';
+  } else if (functionName === 'doubleHumanizeText') {
+    functionUrl = process.env.REACT_APP_DOUBLE_HUMANIZE_FUNCTION_URL || 'https://us-central1-humanizertext-551ee.cloudfunctions.net/doubleHumanizeText';
   } else {
     functionUrl = process.env.REACT_APP_DETECT_AI_FUNCTION_URL || 'https://detectaitext-qq6lep6f5a-uc.a.run.app';
   }
@@ -174,6 +176,7 @@ const Home: React.FC = () => {
   const [iterativeMode, setIterativeMode] = useState(false);
   const [iterativeProgress, setIterativeProgress] = useState<any[]>([]);
   const [mistralMode, setMistralMode] = useState(false);
+  const [doubleMode, setDoubleMode] = useState(false);
   const [writingStyle, setWritingStyle] = useState('professional');
   const [textLength, setTextLength] = useState('maintain');
   const [customInstructions, setCustomInstructions] = useState('');
@@ -456,7 +459,9 @@ const Home: React.FC = () => {
     
     try {
       let functionName = 'humanizeText';
-      if (mistralMode) {
+      if (doubleMode) {
+        functionName = 'doubleHumanizeText';
+      } else if (mistralMode) {
         functionName = 'mistralHumanizeText';
       } else if (iterativeMode) {
         functionName = 'iterativeHumanizeText';
@@ -1035,7 +1040,10 @@ const Home: React.FC = () => {
                       checked={mistralMode}
                       onChange={(e) => {
                         setMistralMode(e.target.checked);
-                        if (e.target.checked) setIterativeMode(false);
+                        if (e.target.checked) {
+                          setIterativeMode(false);
+                          setDoubleMode(false);
+                        }
                       }}
                       style={{
                         width: '16px',
@@ -1053,6 +1061,37 @@ const Home: React.FC = () => {
                       }}
                     >
                       🧠 Mistral AI (High Creativity)
+                    </label>
+                  </Box>
+                  
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <input
+                      type="checkbox"
+                      id="doubleMode"
+                      checked={doubleMode}
+                      onChange={(e) => {
+                        setDoubleMode(e.target.checked);
+                        if (e.target.checked) {
+                          setIterativeMode(false);
+                          setMistralMode(false);
+                        }
+                      }}
+                      style={{
+                        width: '16px',
+                        height: '16px',
+                        accentColor: '#8b5cf6'
+                      }}
+                    />
+                    <label 
+                      htmlFor="doubleMode" 
+                      style={{ 
+                        color: 'rgba(255,255,255,0.8)', 
+                        fontSize: '0.9rem',
+                        cursor: 'pointer',
+                        userSelect: 'none'
+                      }}
+                    >
+                      🔄 Double Humanization (2x Processing)
                     </label>
                   </Box>
                 </Box>
