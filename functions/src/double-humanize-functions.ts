@@ -1,22 +1,22 @@
 import {onRequest} from "firebase-functions/v2/https";
 import {getFirestore} from "firebase-admin/firestore";
 import axios from "axios";
-import { v4 as uuidv4 } from 'uuid';
 
 // CORS configuration
 const corsOptions = {
   cors: true
 };
 
-// User-Agent pool for rotation
+// More diverse User-Agent pool with realistic browser versions
 const USER_AGENTS = [
-  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36',
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36',
-  'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15',
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0',
-  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36 Edg/140.0.0.0',
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36 Edg/140.0.0.0'
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/119.0',
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0',
+  'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 OPR/106.0.0.0'
 ];
 
 // Generate random browser fingerprint
@@ -127,6 +127,110 @@ async function runDoubleHumanization(text: string): Promise<any> {
   return await runGptinfDoubleHumanization(text);
 }
 
+// Enhanced humanization with sophisticated retry logic
+async function humanizeTextWithRetry(session: any, text: string, attemptName: string, maxRetries: number): Promise<string | null> {
+  console.log(`🔄 ${attemptName}...`);
+  console.log(`📝 Input text (${text.split(' ').length} words):`);
+  console.log(text);
+  console.log('\n' + '='.repeat(60));
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`Attempt ${attempt}/${maxRetries}`);
+      
+      // Generate unique session ID for each attempt
+      const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      console.log(`🆔 Session ID: ${sessionId}`);
+      
+      // Add random delay before each attempt to mimic human behavior
+      if (attempt > 1) {
+        const delay = 5000 + Math.random() * 10000; // 5-15 seconds
+        console.log(`⏳ Waiting ${Math.round(delay/1000)} seconds before retry...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+      
+      // Step 1: Start processing
+      console.log('🔄 Starting processing...');
+      
+      const payload = {
+        cacheMode: "start",
+        text: text,
+        model: "free2",
+        keywords: [],
+        sessionId: sessionId,
+        alg: 0,
+        trialNumber: 0
+      };
+      
+      const startResponse = await session.post('/api/process_free', payload);
+      console.log(`Start status: ${startResponse.status}`);
+      
+      if (startResponse.status !== 200) {
+        console.log(`❌ Start failed with status ${startResponse.status}: ${startResponse.data}`);
+        continue;
+      }
+      
+      const startData = startResponse.data;
+      const completionId = startData.completionId;
+      
+      if (!completionId) {
+        console.log('❌ No completion ID');
+        continue;
+      }
+      
+      console.log(`✅ Got completion ID: ${completionId}`);
+      
+      // Step 2: Wait with progressive timing
+      const waitTimes = [20, 25, 30, 35, 40]; // Progressive wait times
+      const waitTime = waitTimes[Math.min(attempt - 1, waitTimes.length - 1)];
+      console.log(`⏳ Waiting ${waitTime} seconds for processing...`);
+      await new Promise(resolve => setTimeout(resolve, waitTime * 1000));
+      
+      console.log('🔄 Getting results...');
+      
+      const getPayload = {
+        cacheMode: "get",
+        completionId: completionId,
+        sessionId: sessionId,
+        text: "",
+        token: ""
+      };
+      
+      const getResponse = await session.post('/api/process_free', getPayload);
+      console.log(`Get status: ${getResponse.status}`);
+      
+      if (getResponse.status === 200) {
+        const resultData = getResponse.data;
+        
+        if (resultData.result && resultData.result.length > 0) {
+          const humanized = resultData.result[0].text;
+          console.log(`✅ ${attemptName} successful!`);
+          console.log(`📝 Output text (${humanized.split(' ').length} words):`);
+          console.log(humanized);
+          return humanized;
+        } else {
+          console.log(`❌ No result in response: ${JSON.stringify(resultData)}`);
+          continue;
+        }
+      } else {
+        console.log(`❌ Get failed with status ${getResponse.status}: ${getResponse.data}`);
+        continue;
+      }
+      
+    } catch (error: any) {
+      console.log(`❌ Error during ${attemptName.toLowerCase()} attempt ${attempt}: ${error.message}`);
+      if (attempt === maxRetries) {
+        console.log(`❌ All ${maxRetries} attempts failed for ${attemptName}`);
+        return null;
+      }
+      continue;
+    }
+  }
+  
+  console.log(`❌ All ${maxRetries} attempts failed for ${attemptName}`);
+  return null;
+}
+
 // GPTinf double humanization
 async function runGptinfDoubleHumanization(text: string): Promise<any> {
   const baseUrl = "https://www.gptinf.com";
@@ -135,14 +239,19 @@ async function runGptinfDoubleHumanization(text: string): Promise<any> {
   const fingerprint = generateBrowserFingerprint();
   const randomUserAgent = USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
   
-  // Create session with randomized headers and fingerprinting
+  // Extract browser info from User-Agent for more realistic headers
+  const isChrome = randomUserAgent.includes('Chrome');
+  const isFirefox = randomUserAgent.includes('Firefox');
+  const isEdge = randomUserAgent.includes('Edg');
+  
+  // Create session with more sophisticated headers
   const session = axios.create({
     baseURL: baseUrl,
     timeout: 60000,
     headers: {
       'User-Agent': randomUserAgent,
-      'Accept': '*/*',
-      'Accept-Encoding': 'gzip, deflate, br, zstd',
+      'Accept': isFirefox ? 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8' : 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+      'Accept-Encoding': 'gzip, deflate, br',
       'Accept-Language': `${fingerprint.language},en;q=0.9`,
       'Content-Type': 'application/json',
       'Origin': 'https://www.gptinf.com',
@@ -151,32 +260,44 @@ async function runGptinfDoubleHumanization(text: string): Promise<any> {
       'Sec-Fetch-Mode': 'cors',
       'Sec-Fetch-Site': 'same-origin',
       'Sec-Fetch-User': '?1',
-      'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
-      'Sec-Ch-Ua-Mobile': '?0',
-      'Sec-Ch-Ua-Platform': `"${fingerprint.platform === 'Win32' ? 'Windows' : 'macOS'}"`,
-      'DNT': '1',
-      'Cache-Control': 'max-age=0',
+      'Cache-Control': 'no-cache',
+      'Pragma': 'no-cache',
+      'Connection': 'keep-alive',
       'Upgrade-Insecure-Requests': '1'
     }
   });
+  
+  // Add browser-specific headers
+  if (isChrome || isEdge) {
+    session.defaults.headers['Sec-Ch-Ua'] = isEdge ? '"Not_A Brand";v="8", "Chromium";v="120", "Microsoft Edge";v="120"' : '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"';
+    session.defaults.headers['Sec-Ch-Ua-Mobile'] = '?0';
+    session.defaults.headers['Sec-Ch-Ua-Platform'] = `"${fingerprint.platform === 'Win32' ? 'Windows' : 'macOS'}"`;
+  }
+  
+  if (isFirefox) {
+    session.defaults.headers['DNT'] = '1';
+  }
 
   // Set cookies with 500 free words
   session.defaults.headers.common['Cookie'] = generateCookies();
 
-  // First humanization
+  // Add initial delay to mimic human behavior
+  await new Promise(resolve => setTimeout(resolve, 2000 + Math.random() * 3000));
+  
+  // First humanization with enhanced retry logic
   console.log('🔄 Starting first humanization...');
-  const firstResult = await humanizeText(session, text, 'First Humanization');
+  const firstResult = await humanizeTextWithRetry(session, text, 'First Humanization', 5);
   
   if (!firstResult) {
     throw new Error('First humanization failed');
   }
 
-  // Add delay between requests
-  await new Promise(resolve => setTimeout(resolve, 2000 + Math.random() * 3000));
+  // Add longer delay between requests to mimic human behavior
+  await new Promise(resolve => setTimeout(resolve, 3000 + Math.random() * 4000));
 
   // Second humanization using first result
   console.log('🔄 Starting second humanization...');
-  const secondResult = await humanizeText(session, firstResult, 'Second Humanization');
+  const secondResult = await humanizeTextWithRetry(session, firstResult, 'Second Humanization', 5);
   
   if (!secondResult) {
     throw new Error('Second humanization failed');
@@ -191,132 +312,6 @@ async function runGptinfDoubleHumanization(text: string): Promise<any> {
 
 
 
-// Individual humanization step with robust error handling (matching Python approach)
-async function humanizeText(session: any, text: string, attemptName: string, maxRetries: number = 3): Promise<string | null> {
-  console.log(`🔄 ${attemptName}...`);
-  console.log(`📝 Input text (${text.split(' ').length} words):`);
-  console.log(text);
-  console.log("\n" + "=".repeat(60));
-
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      console.log(`Attempt ${attempt + 1}/${maxRetries}`);
-      
-      const sessionId = `session_${uuidv4().replace(/-/g, '').substring(0, 16)}`;
-      console.log(`🆔 Session ID: ${sessionId}`);
-
-      // Step 1: Start processing
-      console.log("🔄 Starting processing...");
-      const startPayload = {
-        cacheMode: "start",
-        text: text,
-        model: "free2",
-        keywords: [],
-        sessionId: sessionId,
-        alg: 0,
-        trialNumber: 0
-      };
-
-      const startResponse = await session.post('/api/process_free', startPayload, { 
-        timeout: 30000, 
-        validateStatus: () => true 
-      });
-      
-      console.log(`Start status: ${startResponse.status}`);
-      
-      if (startResponse.status === 200) {
-        const startData = startResponse.data;
-        console.log(`Start response: ${JSON.stringify(startData)}`);
-        
-        if (startData.code === 'success') {
-          const completionId = startData.completionId;
-          if (completionId) {
-            console.log(`✅ Got completion ID: ${completionId}`);
-            
-            // Wait 15 seconds for processing (matching Python)
-            console.log(`⏳ Waiting 15 seconds for processing...`);
-            await new Promise(resolve => setTimeout(resolve, 15000));
-
-            // Step 2: Get results
-            console.log("🔄 Getting results...");
-            const getPayload = {
-              cacheMode: "get",
-              completionId: completionId,
-              sessionId: sessionId,
-              text: "",
-              token: ""
-            };
-
-            const getResponse = await session.post('/api/process_free', getPayload, { 
-              timeout: 30000, 
-              validateStatus: () => true 
-            });
-            
-            console.log(`Get status: ${getResponse.status}`);
-            
-            if (getResponse.status === 200) {
-              const resultData = getResponse.data;
-              console.log(`Get response: ${JSON.stringify(resultData)}`);
-              
-              if (resultData.result && resultData.result[0]?.text) {
-                const humanized = resultData.result[0].text;
-                console.log(`✅ ${attemptName} successful!`);
-                console.log(`📝 Output text (${humanized.split(' ').length} words):`);
-                console.log(humanized);
-                return humanized;
-              } else if (resultData.result === null) {
-                console.log("⏳ Still processing...");
-                if (attempt < maxRetries - 1) {
-                  await new Promise(resolve => setTimeout(resolve, 2000));
-                  continue;
-                }
-              } else {
-                console.error(`❌ Unexpected result: ${JSON.stringify(resultData)}`);
-                if (attempt < maxRetries - 1) {
-                  await new Promise(resolve => setTimeout(resolve, 2000));
-                  continue;
-                }
-              }
-            } else {
-              console.error(`❌ Get failed with status ${getResponse.status}: ${getResponse.data}`);
-              if (attempt < maxRetries - 1) {
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                continue;
-              }
-            }
-          } else {
-            console.error("❌ No completion ID in response");
-            if (attempt < maxRetries - 1) {
-              await new Promise(resolve => setTimeout(resolve, 2000));
-              continue;
-            }
-          }
-        } else {
-          console.error(`❌ Start failed: ${JSON.stringify(startData)}`);
-          if (attempt < maxRetries - 1) {
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            continue;
-          }
-        }
-      } else {
-        console.error(`❌ Start failed with status ${startResponse.status}: ${startResponse.data}`);
-        if (attempt < maxRetries - 1) {
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          continue;
-        }
-      }
-    } catch (error: any) {
-      console.error(`❌ Error on attempt ${attempt + 1}: ${error.message}`);
-      if (attempt < maxRetries - 1) {
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        continue;
-      }
-    }
-  }
-  
-  console.error(`❌ All ${maxRetries} attempts failed for ${attemptName}`);
-  return null;
-}
 
 // Generate cookies with 500 free words (matching Python script exactly)
 function generateCookies(): string {

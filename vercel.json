@@ -1,13 +1,7 @@
 {
-  "version": 2,
-  "buildCommand": "cd humanizer-frontend && npm install && npm run build",
-  "outputDirectory": "humanizer-frontend/build",
-  "installCommand": "cd humanizer-frontend && npm install",
-  "framework": "create-react-app",
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
+  "functions": {
+    "api/double-humanize.js": {
+      "maxDuration": 300
     }
-  ]
+  }
 }
