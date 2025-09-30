@@ -116,7 +116,7 @@ const callHttpFunction = async (functionName: string, data: any) => {
   } else if (functionName === 'mistralHumanizeText') {
     functionUrl = process.env.REACT_APP_MISTRAL_HUMANIZE_FUNCTION_URL || 'https://us-central1-humanizertext-551ee.cloudfunctions.net/mistralHumanizeText';
   } else if (functionName === 'doubleHumanizeText') {
-    functionUrl = process.env.REACT_APP_DOUBLE_HUMANIZE_FUNCTION_URL || 'https://us-central1-humanizertext-551ee.cloudfunctions.net/doubleHumanizeText';
+    functionUrl = process.env.REACT_APP_DOUBLE_HUMANIZE_FUNCTION_URL || 'https://doublehumanizetext-qq6lep6f5a-uc.a.run.app';
   } else {
     functionUrl = process.env.REACT_APP_DETECT_AI_FUNCTION_URL || 'https://detectaitext-qq6lep6f5a-uc.a.run.app';
   }
