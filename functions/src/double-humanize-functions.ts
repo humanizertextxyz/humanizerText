@@ -14,8 +14,26 @@ const USER_AGENTS = [
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36',
   'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36',
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15',
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0'
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0',
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36 Edg/140.0.0.0',
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36 Edg/140.0.0.0'
 ];
+
+// Generate random browser fingerprint
+function generateBrowserFingerprint() {
+  const screenResolutions = ['1920x1080', '1366x768', '1440x900', '1536x864', '1280x720'];
+  const timezones = ['America/New_York', 'America/Los_Angeles', 'America/Chicago', 'Europe/London', 'Europe/Paris'];
+  const languages = ['en-US', 'en-GB', 'en-CA', 'en-AU'];
+  
+  return {
+    screenResolution: screenResolutions[Math.floor(Math.random() * screenResolutions.length)],
+    timezone: timezones[Math.floor(Math.random() * timezones.length)],
+    language: languages[Math.floor(Math.random() * languages.length)],
+    platform: Math.random() > 0.5 ? 'Win32' : 'MacIntel'
+  };
+}
+
+
 
 // Double Humanization Function
 export const doubleHumanizeText = onRequest({...corsOptions}, async (req, res) => {
@@ -113,23 +131,32 @@ async function runDoubleHumanization(text: string): Promise<any> {
 async function runGptinfDoubleHumanization(text: string): Promise<any> {
   const baseUrl = "https://www.gptinf.com";
   
-  // Create session with rotated headers
+  // Generate random fingerprint for this session
+  const fingerprint = generateBrowserFingerprint();
+  const randomUserAgent = USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
+  
+  // Create session with randomized headers and fingerprinting
   const session = axios.create({
     baseURL: baseUrl,
     timeout: 60000,
     headers: {
-      'User-Agent': USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)],
+      'User-Agent': randomUserAgent,
       'Accept': '*/*',
       'Accept-Encoding': 'gzip, deflate, br, zstd',
-      'Accept-Language': 'en-US,en;q=0.9',
+      'Accept-Language': `${fingerprint.language},en;q=0.9`,
       'Content-Type': 'application/json',
       'Origin': 'https://www.gptinf.com',
       'Referer': 'https://www.gptinf.com/',
       'Sec-Fetch-Dest': 'empty',
       'Sec-Fetch-Mode': 'cors',
       'Sec-Fetch-Site': 'same-origin',
+      'Sec-Fetch-User': '?1',
+      'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+      'Sec-Ch-Ua-Mobile': '?0',
+      'Sec-Ch-Ua-Platform': `"${fingerprint.platform === 'Win32' ? 'Windows' : 'macOS'}"`,
       'DNT': '1',
-      'Cache-Control': 'max-age=0'
+      'Cache-Control': 'max-age=0',
+      'Upgrade-Insecure-Requests': '1'
     }
   });
 
@@ -161,6 +188,7 @@ async function runGptinfDoubleHumanization(text: string): Promise<any> {
     second_result: secondResult
   };
 }
+
 
 
 // Individual humanization step with robust error handling (matching Python approach)
@@ -205,11 +233,9 @@ async function humanizeText(session: any, text: string, attemptName: string, max
           if (completionId) {
             console.log(`✅ Got completion ID: ${completionId}`);
             
-            // Progressive wait times: 5, 10, 15, 30 seconds
-            const waitTimes = [5000, 10000, 15000, 30000];
-            const waitTime = waitTimes[Math.min(attempt, waitTimes.length - 1)];
-            console.log(`⏳ Waiting ${waitTime / 1000} seconds for processing...`);
-            await new Promise(resolve => setTimeout(resolve, waitTime));
+            // Wait 15 seconds for processing (matching Python)
+            console.log(`⏳ Waiting 15 seconds for processing...`);
+            await new Promise(resolve => setTimeout(resolve, 15000));
 
             // Step 2: Get results
             console.log("🔄 Getting results...");
@@ -300,7 +326,7 @@ function generateCookies(): string {
     '_ttp': '01K6B52RAK7CJSJJQ6CF41HVHM_.tt.1',
     '_ga': 'GA1.1.101199240.1759163540',
     '_clck': 'e7p5fq%5E2%5Efzq%5E0%5E2098',
-    // 'email': 'user%40example.com', // Removed - not required
+    'email': '',
     '_gcl_au': '1.1.1268097366.1759163540.1448043288.1759179401.1759179401',
     'token': '',
     'cf_clearance': 'hcWbIly9T74uSgLCSX3irX2oI0vM96pogBw4aasX77Y-1759179404-1.2.1.1-r2GQ0bcpXGezHDYyNS5eXM3833riEw8_tD0HlzsiM2_2Sr2CntXqM0Hp0jOofhcfICNjst6N8eUnlfwUIAhNnTJBsC8ouFsJG6y1wa0YGPccZMQvLOTIF4UF37nB8xbS.qbdVtw2VHYsWX6rDXTfMwOEcsRjFIH8j8K6oj0HSEJUXgMNMNomRJUevmYFxcQv3_vXKzq1HAlUMxt9zjjNzak2lCxe9JzEFjqe7uHOuiI',
