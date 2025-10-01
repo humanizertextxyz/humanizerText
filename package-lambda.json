@@ -1,0 +1,12 @@
+{
+  "name": "gptinf-lambda-function",
+  "version": "1.0.0",
+  "description": "AWS Lambda function for GPTinf double humanization",
+  "main": "aws-lambda-function.js",
+  "dependencies": {
+    "axios": "^1.6.0"
+  },
+  "scripts": {
+    "deploy": "zip -r function.zip aws-lambda-function.js package.json node_modules/"
+  }
+}
