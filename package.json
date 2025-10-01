@@ -1,10 +1,16 @@
 {
-  "name": "humanizer",
+  "name": "humanizer-vercel",
   "version": "1.0.0",
+  "description": "Humanizer Vercel Functions",
+  "main": "api/double-humanize.js",
+  "scripts": {
+    "build": "echo 'No build step required'",
+    "vercel-build": "echo 'No build step required'"
+  },
   "dependencies": {
     "axios": "^1.6.0"
   },
-  "scripts": {
-    "vercel-build": "echo 'No build step needed for serverless functions'"
+  "engines": {
+    "node": ">=18.0.0"
   }
 }

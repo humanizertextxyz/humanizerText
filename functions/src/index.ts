@@ -28,6 +28,9 @@ const corsOptions = {
   cors: true
 };
 
+// Import security utilities
+import { checkRateLimit, getClientIP } from './security-utils';
+
 // Example function - you can add more functions here
 export const helloWorld = onCall(async (request) => {
   // Check if user is authenticated
@@ -485,6 +488,19 @@ export const humanizeText = onRequest({secrets: [openaiApiKey], ...corsOptions},
   }
 
   try {
+    // Get client IP for rate limiting
+    const clientIP = getClientIP(req);
+    
+    // Rate limiting check (10 requests per minute per IP)
+    if (!checkRateLimit(clientIP, 10, 60000)) {
+      console.log(`🚫 Rate limit exceeded for IP: ${clientIP}`);
+      res.status(429).json({ 
+        error: 'Rate limit exceeded. Please try again later.',
+        retryAfter: 60
+      });
+      return;
+    }
+    
     const { 
       text, 
       writingStyle, 
