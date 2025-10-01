@@ -159,7 +159,7 @@ const callHttpFunction = async (functionName: string, data: any) => {
     throw new Error('Invalid JSON response from server');
   }
   
-  return { data: result.result };
+  return { data: result };
 };
 
 const Home: React.FC = () => {
@@ -481,9 +481,17 @@ const Home: React.FC = () => {
       
       const data = result.data as HumanizationResult;
       
+      // Debug logging
+      console.log('Response data:', data);
+      
       // Handle iterative progress if available
-      if (data.progress && Array.isArray(data.progress)) {
+      if (data && data.progress && Array.isArray(data.progress)) {
         setIterativeProgress(data.progress);
+      }
+      
+      // Check if data exists
+      if (!data) {
+        throw new Error('No data received from function');
       }
       
       // FRONTEND DASH REMOVAL - Clean the text after receiving from Firebase

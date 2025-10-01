@@ -3,9 +3,10 @@ const axios = require('axios');
 exports.handler = async (event, context) => {
   // CORS headers
   const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Origin': 'https://humanizertext.xyz',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Credentials': 'true',
     'Content-Type': 'application/json'
   };
 
@@ -29,7 +30,21 @@ exports.handler = async (event, context) => {
 
   try {
     // Parse request body
-    const { text } = JSON.parse(event.body);
+    const requestBody = JSON.parse(event.body);
+    
+    // Handle both direct text and wrapped data format
+    let text;
+    if (requestBody.text) {
+      text = requestBody.text;
+    } else if (requestBody.data && requestBody.data.text) {
+      text = requestBody.data.text;
+    } else {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'Text is required' })
+      };
+    }
     
     if (!text) {
       return {
@@ -227,36 +242,46 @@ exports.handler = async (event, context) => {
     // Run double humanization with enhanced retry logic
     console.log('🚀 Starting enhanced double humanization...');
     
-    // First humanization
-    const firstResult = await humanizeTextWithRetry(text, 'First Humanization', 3);
+    // Set a timeout for the entire operation (1 minute)
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Function timeout after 1 minute')), 60000);
+    });
     
-    if (!firstResult) {
-      throw new Error('First humanization failed');
-    }
-
-    console.log('✅ First humanization completed');
-    console.log('🔄 Starting second humanization...');
-
-    // Second humanization using first result
-    const secondResult = await humanizeTextWithRetry(firstResult, 'Second Humanization', 3);
+    const humanizationPromise = (async () => {
+      // First humanization
+      const firstResult = await humanizeTextWithRetry(text, 'First Humanization', 3);
     
-    if (!secondResult) {
-      throw new Error('Second humanization failed');
-    }
+      if (!firstResult) {
+        throw new Error('First humanization failed');
+      }
 
-    console.log('✅ Enhanced double humanization completed successfully!');
+      console.log('✅ First humanization completed');
+      console.log('🔄 Starting second humanization...');
 
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify({
-        success: true,
-        humanized_text: secondResult,
-        progress: 100,
-        iterations: 2,
-        final_ai_percentage: 0
-      })
-    };
+      // Second humanization using first result
+      const secondResult = await humanizeTextWithRetry(firstResult, 'Second Humanization', 3);
+      
+      if (!secondResult) {
+        throw new Error('Second humanization failed');
+      }
+
+      console.log('✅ Enhanced double humanization completed successfully!');
+
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+          success: true,
+          humanized_text: secondResult,
+          progress: 100,
+          iterations: 2,
+          final_ai_percentage: 0
+        })
+      };
+    })();
+
+    // Race between humanization and timeout
+    return await Promise.race([humanizationPromise, timeoutPromise]);
 
   } catch (error) {
     console.error('❌ Enhanced Netlify function error:', error);

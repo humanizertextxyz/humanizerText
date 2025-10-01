@@ -1,15 +1,29 @@
 {
-  "name": "humanizer-vercel",
+  "name": "self-hosted-humanizer",
   "version": "1.0.0",
-  "description": "Humanizer Vercel Functions",
-  "main": "api/double-humanize.js",
+  "description": "Self-hosted humanizer server to bypass Cloudflare blocking",
+  "main": "self-hosted-server.js",
   "scripts": {
-    "build": "echo 'No build step required'",
-    "vercel-build": "echo 'No build step required'"
+    "start": "node self-hosted-server.js",
+    "dev": "nodemon self-hosted-server.js",
+    "pm2": "pm2 start self-hosted-server.js --name humanizer",
+    "pm2:stop": "pm2 stop humanizer",
+    "pm2:restart": "pm2 restart humanizer",
+    "pm2:logs": "pm2 logs humanizer"
   },
   "dependencies": {
-    "axios": "^1.12.2"
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "axios": "^1.6.8",
+    "express-rate-limit": "^7.1.5"
   },
+  "devDependencies": {
+    "nodemon": "^3.0.1",
+    "pm2": "^5.3.0"
+  },
+  "keywords": ["humanizer", "gptinf", "cloudflare", "bypass", "self-hosted"],
+  "author": "Humanizer Team",
+  "license": "MIT",
   "engines": {
     "node": ">=18.0.0"
   }

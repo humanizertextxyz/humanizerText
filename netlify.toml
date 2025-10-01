@@ -1,5 +1,5 @@
 [build]
-  publish = "humanizer-frontend/build"
+  publish = "build"
   functions = "netlify/functions"
 
 [build.environment]
